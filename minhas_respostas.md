@@ -357,6 +357,93 @@ $top5Clientes = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id
   - **Sintaxe Eloquent Exata:** Uso correto do `join()`, `select()`, `DB::raw('SUM(...)')`, `groupBy()`, `orderByDesc()` e `limit(5)`.
   - **Otimização Completa:** Cobriu indexação de chave estrangeira, índice composto, caching em memória com Redis e Eager Loading.
 
+---
+
+
+## Questão 15 - SQL e Eloquent (Produtos, Fornecedores e Estoque)
+
+**Enunciado do PDF:**
+> Você trabalhará com um banco de dados relacional contendo informações sobre produtos, fornecedores e estoque. Seu objetivo é escrever queries SQL para obter insights a partir dessas tabelas, aplicando funções de agregação e filtragem de dados.
+>
+> **Estrutura de Tabelas:**
+> - `produtos` (`id`, `nome`, `fornecedor_id`, `categoria`, `preco_unit`, `data_aquisicao`)
+> - `fornecedores` (`id`, `nome`, `pais`, `status`)
+> - `estoque` (`id`, `produto_id`, `quantidade`, `data_contagem`)
+>
+> **Utilizando o Eloquent do Laravel:**
+> - Escreva uma query para identificar os produtos que possuem estoque abaixo da média geral.
+> - Escreva uma query para identificar quais fornecedores possuem produtos cujo preço unitário é maior que a média dos preços dentro de sua categoria? Exiba o nome do fornecedor, nome do produto, categoria e o preço. (Para melhor análise, lembre de ordenar a tabela por categoria e preço unitário dos produtos.)
+> - Escreva uma query para identificar quais são os produtos mais recentes, adquiridos de fornecedores do Brasil, e possuem estoque acima da média de todos os produtos.
+
+---
+
+### 15.1 - Query em Eloquent (Produtos com estoque abaixo da média geral):
+```php
+use App\Models\Produto;
+use App\Models\Estoque;
+
+// 1. Média escalar geral de quantidade no estoque
+$mediaEstoque = Estoque::avg('quantidade');
+
+// 2. Consulta Eloquent com filtro no relacionamento de estoque e Eager Loading
+$produtosEstoqueBaixo = Produto::whereHas('estoque', function ($query) use ($mediaEstoque) {
+    $query->where('quantidade', '<', $mediaEstoque);
+})->with('estoque')->get();
+```
+
+---
+
+### 15.2 - Query em Eloquent (Fornecedores com produtos com preço acima da média da sua categoria):
+```php
+use App\Models\Produto;
+
+$produtosPrecoAcimaMediaCategoria = Produto::from('produtos as p1')
+    ->join('fornecedores as f', 'p1.fornecedor_id', '=', 'f.id')
+    ->where('p1.preco_unit', '>', function ($query) {
+        $query->selectRaw('AVG(p2.preco_unit)')
+            ->from('produtos as p2')
+            ->whereColumn('p2.categoria', 'p1.categoria');
+    })
+    ->select('f.nome as nome_fornecedor', 'p1.nome as nome_produto', 'p1.categoria', 'p1.preco_unit')
+    ->orderBy('p1.categoria', 'asc')
+    ->orderBy('p1.preco_unit', 'desc')
+    ->get();
+```
+
+---
+
+### 15.3 - Query em Eloquent (Produtos mais recentes de fornecedores do Brasil com estoque acima da média):
+```php
+use App\Models\Produto;
+use App\Models\Estoque;
+
+// 1. Média geral de estoque no banco
+$mediaEstoque = Estoque::avg('quantidade');
+
+// 2. Consulta Eloquent integrando relacionamentos de Fornecedor e Estoque
+$produtosRecentesBrasilEstoqueAlto = Produto::whereHas('fornecedor', function ($query) {
+        $query->where('pais', 'Brasil');
+    })
+    ->whereHas('estoque', function ($query) use ($mediaEstoque) {
+        $query->where('quantidade', '>', $mediaEstoque);
+    })
+    ->with(['fornecedor', 'estoque'])
+    ->orderByDesc('data_aquisicao')
+    ->get();
+```
+
+---
+
+**Análise Crítica & Avaliação Técnica (Nota 10 / 10 - Domínio Avançado de Subqueries e Relacionamentos Eloquent):**
+
+- **Pontos Positivos / Acertos Impecáveis:**
+  - **15.1 — Agregação Escalar e Eager Loading:** Uso correto do `Estoque::avg()` combinado com `whereHas()` e `with()` para prevenir N+1 queries.
+  - **15.2 — Subquery Correlacionada em Eloquent:** Uso excelente da cláusula `whereColumn('p2.categoria', 'p1.categoria')` para comparar cada produto especificamente com a média de preço da sua categoria, atendendo rigorosamente à ordenação solicitada (`orderBy asc/desc`).
+  - **15.3 — Composição de Múltiplos Relacionamentos:** Combinação limpa de `whereHas('fornecedor')` com filtro de país (`pais = 'Brasil'`), `whereHas('estoque')` com filtro acima da média e ordenação descrescente por `data_aquisicao`.
+
+---
+
+
 
 
 
