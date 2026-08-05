@@ -1,5 +1,5 @@
 <script setup>
-// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Edit/Delete Modals)
+// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Image Previews)
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
@@ -795,7 +795,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Seção 2: Cadastrar Novo Produto -->
+        <!-- Seção 2: Cadastrar Novo Produto (com Preview da Imagem) -->
         <div class="admin-card" style="margin-bottom: 2rem;">
           <h3>Cadastrar Novo Produto</h3>
           
@@ -813,6 +813,12 @@ onMounted(() => {
             <div class="form-group full-width">
               <label>URL da Imagem</label>
               <input v-model="newProduto.imagem" type="text" placeholder="https://exemplo.com/imagem.jpg" />
+              
+              <!-- Live Preview da Imagem -->
+              <div v-if="newProduto.imagem" style="margin-top: 0.75rem; display: flex; align-items: center; gap: 1rem; background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                <img :src="newProduto.imagem" alt="Preview Novo Produto" style="width: 70px; height: 70px; object-fit: cover; border-radius: 6px;" @error="$event.target.style.display='none'" />
+                <span style="font-size: 0.85rem; color: var(--text-muted);">🖼️ Pré-visualização da imagem do produto</span>
+              </div>
             </div>
 
             <div class="form-group full-width">
@@ -898,7 +904,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- MODAL PAINEL ADMIN: EDIÇÃO E EXCLUSÃO DO PRODUTO -->
+    <!-- MODAL PAINEL ADMIN: EDIÇÃO E EXCLUSÃO DO PRODUTO (COM PREVIEW DA IMAGEM) -->
     <div v-if="editingProduto" class="modal-overlay" @click.self="editingProduto = null">
       <div class="modal-content" style="max-width: 520px;">
         <div class="header" style="position: relative;">
@@ -921,6 +927,15 @@ onMounted(() => {
           <div class="form-group full-width">
             <label>URL da Imagem</label>
             <input v-model="editingProduto.imagem" type="text" />
+            
+            <!-- Live Preview da Imagem no Modal de Edição -->
+            <div v-if="editingProduto.imagem" style="margin-top: 0.75rem; display: flex; align-items: center; gap: 1rem; background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <img :src="editingProduto.imagem" alt="Preview Produto Edição" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px;" @error="$event.target.style.display='none'" />
+              <div>
+                <strong style="font-size: 0.85rem; color: #818cf8;">🖼️ Pré-visualização ao vivo</strong>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Atualizada dinamicamente ao alterar a URL acima.</p>
+              </div>
+            </div>
           </div>
 
           <div class="form-group full-width">
