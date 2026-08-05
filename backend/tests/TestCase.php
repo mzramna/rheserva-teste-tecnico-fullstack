@@ -12,6 +12,12 @@ abstract class TestCase extends BaseTestCase
 
         $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
+        // Força isolamento total para SQLite in-memory nos testes automatizados
+        config([
+            'database.default' => 'sqlite',
+            'database.connections.sqlite.database' => ':memory:',
+        ]);
+
         return $app;
     }
 }

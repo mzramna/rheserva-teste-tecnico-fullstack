@@ -1,8 +1,8 @@
 FROM php:8.4-cli
 
 RUN apt-get update && apt-get install -y \
-    libpng-dev libonig-dev libxml2-dev zip unzip git curl \
-    && docker-php-ext-install pdo_mysql mbstring gd
+    libpng-dev libonig-dev libxml2-dev libsqlite3-dev zip unzip git curl \
+    && docker-php-ext-install pdo_mysql pdo_sqlite mbstring gd
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
