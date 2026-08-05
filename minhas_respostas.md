@@ -257,6 +257,41 @@ public function transform(InterfaceItemPedido $orderItem)
 ---
 
 
+## Questão 13 - Descreva uma situação em que você teve que lidar com um problema técnico complexo ou um imprevisto em um projeto de desenvolvimento (Método STAR: Situação, Tarefa, Ação, Resultado)
+
+**Resposta do Candidato (Relato de Experiência Real):**
+
+- **S — Situação (Situation):** Um cliente reportou um problema crítico de comunicação: as mensagens enviadas ativamente pelo sistema não estavam aparecendo no aparelho celular (dispositivo móvel) do contato/destinatário final.
+- **T — Tarefa (Task):** Isolar e diagnosticar a causa raiz da falha de entrega — verificando se tratava-se de um problema no disparo/envio, na camada de sincronização de dados ou de um bug não mapeado no código da plataforma.
+- **A — Ação (Action):**
+  1. **Análise Comparativa de Evidências Visual e Comportamental:** Avaliei os prints de tela enviados pela cliente (comparando a interface do sistema versus a tela do dispositivo móvel do destinatário), o que permitiu identificar que o problema ocorria exclusivamente com as mensagens originadas e disparadas ativamente pelo sistema (e não com as respostas/mensagens vindas do contato).
+  2. **Investigação da Cadeia de Logs Internos:** Analisei os logs da ferramenta de envio de mensagens do sistema, os quais registravam incorretamente que o disparo havia sido efetuado com sucesso.
+  3. **Inspeção no Gateway de Erros da Plataforma de Mensageria:** Acessei o gateway de erros da API da plataforma de comunicação de terceiros. Constatei que, no exato intervalo de tempo dos disparos, a plataforma retornava erros de recusa informando que o sistema não podia enviar a mensagem por descumprimento de diretrizes de uso (bloqueio por janela de conversação fechada).
+  4. **Identificação da Causa Raiz:** Descobri que o sistema utilizava "suposições calculadas" (cálculos locais estimados de tempo) para adivinhar se a janela de comunicação de 24h com o contato estava aberta, em vez de consultar e validar os status reais fornecidos pelo provedor.
+  5. **Desenvolvimento da Solução:** Como parte de uma demanda em andamento (integração do recebimento de status via gateway), desenvolvi e implementei um mecanismo de captura e registro de webhooks/eventos com valores realistas (provenientes diretamente das respostas do gateway da plataforma), eliminando completamente o cálculo por suposição.
+- **R — Resultado (Result):** A solução implementou rastreabilidade real e confiável sobre a abertura/fechamento das janelas de comunicação, eliminando falsos positivos e prevenindo o bloqueio de envios por descumprimento de diretrizes das plataformas de mensageria (funcionalidade desenvolvida e atualmente em fase final de testes para implantação em produção).
+
+---
+
+**Análise Crítica & Avaliação Técnica (Nota 10 / 10 - Excelente Metodologia de Investigação e Solução de Causa Raiz):**
+
+- **Pontos Positivos / Acertos Impecáveis:**
+  - **Metodologia Científica de Debugging:** O candidato seguiu um processo lógico exemplar de isolamento de hipóteses:
+    1. *Filtro visual/comportamental:* isolou que o problema ocorria apenas nas mensagens de saída do sistema (*outbound*).
+    2. *Validação interna vs. externa:* percebeu a inconsistência entre os logs internos da aplicação (que registravam falso sucesso) e os logs do gateway da API do provedor (que registravam rejeição por regra de negócio).
+    3. *Eliminação da causa sintomática:* não se limitou a silenciar o erro ou reenviar a mensagem, mas buscou a razão pela qual a plataforma rejeitou o envio.
+  - **Identificação da Falha de Arquitetura (Suposição vs. Estado Real):** Identificou com precisão um anti-pattern comum em integrações de mensageria (como WhatsApp Business API): tentar calcular o estado de uma janela de 24h via timers locais em vez de se basear no estado real informado pela API via Webhooks (`statuses` e `events`).
+  - **Solução Arquitetural Definitiva:** Desenvolveu a captura reativa dos status de retorno do gateway, tornando o sistema orientado a eventos (*event-driven*) e tolerante a falhas.
+  - **Estruturação STAR Impecável:** Cobriu todos os 4 pilares do método STAR com clareza, objetividade e detalhes técnicos do mundo real.
+
+- **Conceitos de Engenharia Relevantes para Entrevistas (Diferenciação Sênior):**
+  - **Event-Driven Architecture & Webhooks:** Em integrações com provedores de mensageria (ex: Meta/WhatsApp, Twilio, Z-API), o modelo ideal de consistência é o uso de Webhooks assíncronos que atualizam o estado da conversa no banco no momento em que a plataforma notifica o evento (`delivered`, `read`, `failed`, `session_expired`).
+  - **Idempotência & Resiliência:** Ao registrar retornos de gateway, garante-se a idempotência do envio (evita disparar novamente caso a janela já tenha expirado ou falhado).
+
+---
+
+
+
 
 
 
