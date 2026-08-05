@@ -188,25 +188,25 @@ public function transform(InterfaceItemPedido $orderItem)
 
 ---
 
-## Questão 12 - Frontend Checkout (Vue.js + `cep-promise` + Validação + Loading)
+## Questão 10 - Desenvolvimento Full-Stack (Laravel + Vue.js) & Questão 12 (Checkout e Busca por CEP)
 
-**Pergunta:** Crie uma página de Checkout simples utilizando Vue.js. A página deve conter formulário para o endereço do cliente utilizando a biblioteca `cep-promise` para busca automática por CEP. Adicione validações simples (campos obrigatórios, formato de CEP) e exiba uma mensagem de sucesso após o envio. Inclua um indicador de carregamento (spinner/loading) durante a busca do CEP e o envio do formulário.
+**Descrição:** Unificação completa das Questões 10 e 12 em uma única aplicação Full-Stack E-Commerce profissional, seguindo princípios de arquitetura enxuta (*ponytail: zero unnecessary boilerplate or over-engineering*):
 
-**Resposta do Candidato (Projeto Prático Implementado):**
-> "O projeto da Questão 12 foi estruturado com o mesmo padrão da Questão 10 (*ponytail: no unnecessary boilerplate or over-engineering*), utilizando nomes de pastas prefixados `12_*`:
->
-> 1. **`12_infra/`**: Arquivo [`docker-compose.yml`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/12_infra/docker-compose.yml) orquestrando o **Traefik v3** como Proxy Reverso único na porta 882 (URL `http://localhost:882`).
-> 2. **`12_frontend/`**: Aplicação Vue 3 em [`App.vue`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/12_frontend/src/App.vue) integrada com a biblioteca **`cep-promise`** para preenchimento automático de endereço ao digitar 8 dígitos ou dar blur no CEP. Contém validações reativas para formato de CEP (`/^\d{8}$/`) e campos obrigatórios, indicadores visuais de carregamento (*spinners*) tanto na busca do CEP quanto na submissão do formulário, e alertas de confirmação com ID de pedido. Acompanhado de testes unitários em [`Checkout.spec.js`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/12_frontend/src/__tests__/Checkout.spec.js).
-> 3. **`12_backend/`**: API REST Laravel 11 em [`CheckoutController.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/12_backend/app/Http/Controllers/CheckoutController.php) processando o endpoint POST `/api/checkout` e retornando status 201 Created com código de confirmação."
-
-**Análise & Comparação com o Gabarito (Nota Máxima / Projeto Completo):**
-- **Pontos Positivos / Acertos Impecáveis:**
-  - **Busca de CEP Automatizada com `cep-promise`:** Integração limpa trazendo rua, bairro, cidade e estado em tempo real.
-  - **Indicadores de Loading Duplos:** Spinner dedicado no input durante a requisição do CEP e spinner no botão durante o envio do checkout.
-  - **Validação de Formulário Completa:** Bloqueio de envios inválidos com exibição de mensagens de erro campo a campo.
-  - **Arquitetura & Conteinerização:** Mapeamento unificado no Traefik (porta 882) mantendo a simetria com a Questão 10.
+- **📁 `infra/`**: Arquivo [`docker-compose.yml`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/infra/docker-compose.yml) orquestrando o **Traefik v3** como Proxy Reverso único na **porta 880** (`http://localhost:880`), banco de dados **MySQL 8.0** (`rheserva_db`) e **Redis Alpine**.
+- **📁 `backend/`**: Aplicação Laravel 11 (PHP 8.4) com rotas em [`api.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/routes/api.php):
+  - **Catálogo de Produtos:** Controller REST [`ProdutoController.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/app/Http/Controllers/ProdutoController.php) otimizado com **Redis Cache** (`produtos_all_list`). Leitura pública e operações de mutação (Criar/Editar/Deletar) protegidas por **Laravel Sanctum Auth**.
+  - **Checkout de Pedidos:** Controller REST [`CheckoutController.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/app/Http/Controllers/CheckoutController.php) processando envios públicos de checkout e salvando o pedido e endereço no banco de dados MySQL (`checkouts` table).
+  - **Autenticação Admin:** Controller [`AuthController.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/app/Http/Controllers/AuthController.php) para login de administradores (`admin@rheserva.com` / `password123`).
+  - **Ferramenta CLI:** Comando Artisan [`CreateUserCommand.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/app/Console/Commands/CreateUserCommand.php) (`php artisan user:create`).
+  - **Suíte de Testes:** Testes automatizados PHPUnit cobrindo rotas da API, validações e comandos CLI (`6 passed`).
+- **📁 `frontend/`**: Aplicação Vue 3 (Composition API com `<script setup>`) em [`App.vue`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/frontend/src/App.vue):
+  - **🛍️ Catálogo de Loja (Público):** Exibe produtos disponíveis com foto, descrição e preço, e botão para adicionar ao carrinho.
+  - **🛒 Carrinho & Checkout (Público):** Exibe itens adicionados, controle de quantidades, subtotal e formulário de entrega com busca automática de CEP via **`cep-promise`**, validações reativas de tipo, higienização de apenas números no campo `Número`, destaque visual de erro (*overlay vermelho suave*) apenas em campos interagidos (*dirty/touched*) e botão bloqueado até que todos os campos estejam válidos.
+  - **🔐 Painel Administrativo (Protegido por Login):** Modal de login para admins e formulário/tabela de gestão CRUD de produtos.
+  - **Suíte de Testes:** Testes unitários Vitest em [`App.spec.js`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/frontend/src/__tests__/App.spec.js).
 
 ---
+
 
 
 

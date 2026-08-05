@@ -95,6 +95,24 @@ const markTouched = (field) => {
   touched[field] = true
 }
 
+// Troca de Aba com Proteção para Painel Admin
+const navigateTo = (viewName) => {
+  if (viewName === 'admin' && !user.value) {
+    loginError.value = ''
+    showLoginModal.value = true
+    return
+  }
+  currentView.value = viewName
+}
+
+// Fechamento do Modal sem Login -> Retorna para Produtos
+const closeLoginModal = () => {
+  showLoginModal.value = false
+  if (!user.value) {
+    currentView.value = 'store'
+  }
+}
+
 // Carregar Produtos da API (Público)
 const fetchProdutos = async () => {
   loadingProdutos.value = true
@@ -209,7 +227,6 @@ const submitCheckout = async () => {
     const response = await axios.post(`${API_URL}/checkout`, payload)
     orderSuccess.value = response.data
     
-    // Limpar Carrinho e Formulário após sucesso
     cart.value = []
     Object.keys(form).forEach(key => form[key] = '')
     Object.keys(touched).forEach(key => touched[key] = false)
@@ -256,8 +273,14 @@ const handleLogout = async () => {
   }
 }
 
-// Ações Administrativas (Criar/Excluir Produtos)
+// Ações Administrativas Protegidas (Criar/Excluir Produtos exige Token de Admin)
 const handleCreateProduto = async () => {
+  if (!user.value || !token.value) {
+    alert('Acesso negado: Apenas administradores autenticados podem cadastrar produtos.')
+    closeLoginModal()
+    return
+  }
+
   submittingProduto.value = true
   try {
     await axios.post(`${API_URL}/produtos`, newProduto, {
@@ -265,14 +288,21 @@ const handleCreateProduto = async () => {
     })
     Object.keys(newProduto).forEach(k => newProduto[k] = '')
     await fetchProdutos()
+    alert('Produto cadastrado com sucesso no banco de dados!')
   } catch (err) {
-    alert(err.response?.data?.message || 'Erro ao criar produto.')
+    alert(err.response?.data?.message || 'Erro 401: Ação não autorizada pelo servidor.')
   } finally {
     submittingProduto.value = false
   }
 }
 
 const handleDeleteProduto = async (id) => {
+  if (!user.value || !token.value) {
+    alert('Acesso negado: Apenas administradores autenticados podem excluir produtos.')
+    closeLoginModal()
+    return
+  }
+
   if (!confirm('Deseja realmente excluir este produto?')) return
 
   try {
@@ -281,7 +311,7 @@ const handleDeleteProduto = async (id) => {
     })
     await fetchProdutos()
   } catch (err) {
-    alert('Erro ao excluir produto.')
+    alert('Erro 401: Exclusão não autorizada pelo servidor.')
   }
 }
 
@@ -294,13 +324,13 @@ onMounted(() => {
   <div class="app-wrapper">
     <!-- Navbar Topo -->
     <header class="navbar">
-      <div class="brand" @click="currentView = 'store'">RHeserva Store</div>
+      <div class="brand" @click="navigateTo('store')">RHeserva Store</div>
       
       <nav class="nav-links">
         <button 
           class="nav-btn" 
           :class="{ active: currentView === 'store' }" 
-          @click="currentView = 'store'"
+          @click="navigateTo('store')"
         >
           🛍️ Produtos
         </button>
@@ -308,7 +338,7 @@ onMounted(() => {
         <button 
           class="nav-btn" 
           :class="{ active: currentView === 'cart' }" 
-          @click="currentView = 'cart'"
+          @click="navigateTo('cart')"
         >
           🛒 Carrinho <span v-if="totalCartItems > 0" class="badge">{{ totalCartItems }}</span>
         </button>
@@ -317,15 +347,15 @@ onMounted(() => {
           <button 
             class="nav-btn" 
             :class="{ active: currentView === 'admin' }" 
-            @click="currentView = 'admin'"
+            @click="navigateTo('admin')"
           >
             ⚙️ Painel Admin
           </button>
-          <button class="nav-btn" @click="handleLogout">🚪 Sair</button>
+          <button class="nav-btn" @click="handleLogout">🚪 Sair ({{ user.name }})</button>
         </template>
 
         <template v-else>
-          <button class="nav-btn" @click="showLoginModal = true">🔐 Login Admin</button>
+          <button class="nav-btn" @click="navigateTo('admin')">🔐 Login Admin</button>
         </template>
       </nav>
     </header>
@@ -376,7 +406,7 @@ onMounted(() => {
           <h3>🎉 Checkout Realizado com Sucesso!</h3>
           <p>Número do Pedido: <strong>{{ orderSuccess.pedido_id }}</strong></p>
           <p style="font-size: 0.85rem; margin-top: 0.25rem;">O pedido foi registrado no banco de dados com sucesso!</p>
-          <button class="btn-submit" style="margin-top: 1rem; width: auto; padding: 0.5rem 1.5rem; margin-left: auto; margin-right: auto;" @click="orderSuccess = null; currentView = 'store'">Continuar Comprando</button>
+          <button class="btn-submit" style="margin-top: 1rem; width: auto; padding: 0.5rem 1.5rem; margin-left: auto; margin-right: auto;" @click="orderSuccess = null; navigateTo('store')">Continuar Comprando</button>
         </div>
 
         <div v-else class="checkout-layout">
@@ -386,7 +416,7 @@ onMounted(() => {
             
             <div v-if="cart.length === 0" style="padding: 2rem 0; text-align: center; color: var(--text-muted);">
               <p>Seu carrinho está vazio.</p>
-              <button class="btn-submit" style="margin-top: 1rem;" @click="currentView = 'store'">Ver Produtos</button>
+              <button class="btn-submit" style="margin-top: 1rem;" @click="navigateTo('store')">Ver Produtos</button>
             </div>
 
             <div v-else>
@@ -608,14 +638,14 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- VIEW 3: PAINEL ADMINISTRATIVO (QUESTÃO 10 - PROTEGIDO POR LOGIN) -->
+      <!-- VIEW 3: PAINEL ADMINISTRATIVO (QUESTÃO 10 - STRICTLY PROTEGIDO POR LOGIN) -->
       <section v-else-if="currentView === 'admin' && user">
         <div class="page-header">
           <h2>Painel Administrativo - Gestão de Produtos</h2>
-          <p>Cadastre, edite e gerencie o catálogo de produtos da loja</p>
+          <p>Cadastre, edite e gerencie o catálogo de produtos da loja (Autenticado como {{ user.name }})</p>
         </div>
 
-        <div class="admin-card mb-4" style="margin-bottom: 2rem;">
+        <div class="admin-card" style="margin-bottom: 2rem;">
           <h3>Cadastrar Novo Produto</h3>
           
           <form @submit.prevent="handleCreateProduto" class="form-grid" style="margin-top: 1rem;">
@@ -640,7 +670,7 @@ onMounted(() => {
             </div>
 
             <div class="full-width">
-              <button type="submit" class="btn-submit" :disabled="submittingProduto">
+              <button type="submit" class="btn-submit" :disabled="submittingProduto || !user || !token">
                 <span v-if="submittingProduto" class="btn-spinner"></span>
                 <span>Salvar Produto</span>
               </button>
@@ -680,12 +710,13 @@ onMounted(() => {
 
     </main>
 
-    <!-- MODAL DE LOGIN ADMIN -->
-    <div v-if="showLoginModal" class="modal-overlay" @click.self="showLoginModal = false">
+    <!-- MODAL DE LOGIN ADMIN (Fechamento automático retorna para a página de Produtos) -->
+    <div v-if="showLoginModal" class="modal-overlay" @click.self="closeLoginModal">
       <div class="modal-content">
-        <div class="header">
+        <div class="header" style="position: relative;">
+          <button @click="closeLoginModal" style="position: absolute; right: 0; top: 0; background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
           <h2>Login de Administrador</h2>
-          <p>Autentique-se para gerenciar produtos</p>
+          <p>Autentique-se para gerenciar o catálogo de produtos</p>
         </div>
 
         <div v-if="loginError" class="error-message" style="margin-bottom: 1rem; text-align: center;">
@@ -694,18 +725,22 @@ onMounted(() => {
 
         <form @submit.prevent="handleLogin" style="display: flex; flex-direction: column; gap: 1rem;">
           <div class="form-group">
-            <label>E-mail Admin</label>
-            <input v-model="loginForm.email" type="email" required />
+            <label>E-mail Admin *</label>
+            <input v-model="loginForm.email" type="email" required placeholder="admin@rheserva.com" />
           </div>
 
           <div class="form-group">
-            <label>Senha</label>
-            <input v-model="loginForm.password" type="password" required />
+            <label>Senha *</label>
+            <input v-model="loginForm.password" type="password" required placeholder="••••••••" />
           </div>
 
           <button type="submit" class="btn-submit" :disabled="loginLoading">
             <span v-if="loginLoading" class="btn-spinner"></span>
-            <span>Entrar no Painel</span>
+            <span>Entrar e Acessar Painel</span>
+          </button>
+
+          <button type="button" class="nav-btn" style="width: 100%; justify-content: center;" @click="closeLoginModal">
+            Cancelar e Voltar aos Produtos
           </button>
         </form>
       </div>
