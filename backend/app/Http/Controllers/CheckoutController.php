@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 // ponytail: Public Checkout Controller saving order & cart items into MySQL database
 class CheckoutController extends Controller
 {
+    public function index()
+    {
+        return Checkout::orderBy('id', 'desc')->get();
+    }
+
     public function process(Request $request)
     {
         $validated = $request->validate([

@@ -1,5 +1,5 @@
 <script setup>
-// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout & Admin Product Management)
+// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout & Admin Product/Orders Management)
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
@@ -17,9 +17,11 @@ const loginForm = reactive({ email: 'admin@rheserva.com', password: 'password123
 const loginError = ref('')
 const loginLoading = ref(false)
 
-// Estado dos Produtos & Carrinho
+// Estado dos Produtos, Pedidos & Carrinho
 const produtos = ref([])
+const checkouts = ref([])
 const loadingProdutos = ref(false)
+const loadingCheckouts = ref(false)
 const cart = ref([])
 
 // Novo Produto (Admin)
@@ -63,6 +65,8 @@ const cepError = ref('')
 watch([currentView, user], ([newView, newUser]) => {
   if (newView === 'admin' && !newUser) {
     showLoginModal.value = true
+  } else if (newView === 'admin' && newUser) {
+    fetchCheckouts()
   }
 }, { immediate: true })
 
@@ -130,6 +134,22 @@ const fetchProdutos = async () => {
     console.error('Erro ao carregar produtos:', err)
   } finally {
     loadingProdutos.value = false
+  }
+}
+
+// Carregar Pedidos / Checkouts da API (Protegido por Token Admin)
+const fetchCheckouts = async () => {
+  if (!user.value || !token.value) return
+  loadingCheckouts.value = true
+  try {
+    const response = await axios.get(`${API_URL}/checkouts`, {
+      headers: { Authorization: `Bearer ${token.value}` }
+    })
+    checkouts.value = response.data
+  } catch (err) {
+    console.error('Erro ao carregar pedidos:', err)
+  } finally {
+    loadingCheckouts.value = false
   }
 }
 
@@ -257,6 +277,7 @@ const handleLogin = async () => {
     localStorage.setItem('user', JSON.stringify(user.value))
     showLoginModal.value = false
     currentView.value = 'admin'
+    await fetchCheckouts()
   } catch (err) {
     loginError.value = err.response?.data?.message || 'Credenciais inválidas.'
   } finally {
@@ -643,13 +664,66 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- VIEW 3: PAINEL ADMINISTRATIVO (QUESTÃO 10 - STRICTLY PROTEGIDO POR LOGIN) -->
+      <!-- VIEW 3: PAINEL ADMINISTRATIVO (QUESTÃO 10 - GESTÃO DE PRODUTOS & PEDIDOS) -->
       <section v-else-if="currentView === 'admin' && user">
         <div class="page-header">
-          <h2>Painel Administrativo - Gestão de Produtos</h2>
-          <p>Cadastre, edite e gerencie o catálogo de produtos da loja (Autenticado como {{ user.name }})</p>
+          <h2>Painel Administrativo</h2>
+          <p>Gestão de produtos do catálogo e visualização de pedidos de checkout (Autenticado como {{ user.name }})</p>
         </div>
 
+        <!-- Seção 1: Pedidos Realizados (Checkouts) -->
+        <div class="admin-card" style="margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>📦 Pedidos Realizados ({{ checkouts.length }})</h3>
+            <button class="nav-btn" @click="fetchCheckouts" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">🔄 Atualizar</button>
+          </div>
+
+          <div v-if="loadingCheckouts" style="padding: 2rem; text-align: center;">
+            <div class="btn-spinner" style="margin: 0 auto; width: 24px; height: 24px;"></div>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem;">Carregando pedidos do MySQL...</p>
+          </div>
+
+          <div v-else-if="checkouts.length === 0" style="padding: 2rem; text-align: center; color: var(--text-muted);">
+            <p>Nenhum pedido de checkout registrado até o momento.</p>
+          </div>
+
+          <table v-else class="admin-table">
+            <thead>
+              <tr>
+                <th>ID Pedido</th>
+                <th>Cliente</th>
+                <th>Endereço</th>
+                <th>Cartão</th>
+                <th>Itens</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in checkouts" :key="c.id">
+                <td><strong style="color: #818cf8;">{{ c.pedido_id }}</strong></td>
+                <td>
+                  <div><strong>{{ c.nome }}</strong></div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">{{ c.email }}</div>
+                </td>
+                <td style="font-size: 0.85rem;">
+                  {{ c.rua }}, {{ c.numero }} {{ c.complemento ? '- ' + c.complemento : '' }}<br/>
+                  <span style="color: var(--text-muted);">{{ c.bairro }} - {{ c.cidade }}/{{ c.estado }} ({{ c.cep }})</span>
+                </td>
+                <td style="font-size: 0.85rem; font-family: monospace;">{{ c.cartao_final }}</td>
+                <td style="font-size: 0.85rem;">
+                  <ul style="list-style: none; padding: 0;">
+                    <li v-for="item in (c.itens_json || [])" :key="item.id">
+                      • {{ item.qtd }}x {{ item.nome }}
+                    </li>
+                  </ul>
+                </td>
+                <td><strong style="color: #6ee7b7;">R$ {{ Number(c.total).toFixed(2).replace('.', ',') }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Seção 2: Cadastrar Novo Produto -->
         <div class="admin-card" style="margin-bottom: 2rem;">
           <h3>Cadastrar Novo Produto</h3>
           
@@ -683,8 +757,9 @@ onMounted(() => {
           </form>
         </div>
 
+        <!-- Seção 3: Produtos Cadastrados -->
         <div class="admin-card">
-          <h3>Produtos Cadastrados ({{ produtos.length }})</h3>
+          <h3>Produtos Cadastrados no Catálogo ({{ produtos.length }})</h3>
           
           <table class="admin-table">
             <thead>

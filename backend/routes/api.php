@@ -13,6 +13,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Rotas Protegidas (Exigem Autenticação de Admin via Token Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/checkouts', [CheckoutController::class, 'index']);
     Route::post('/produtos', [ProdutoController::class, 'store']);
     Route::put('/produtos/{produto}', [ProdutoController::class, 'update']);
     Route::delete('/produtos/{produto}', [ProdutoController::class, 'destroy']);
