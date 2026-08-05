@@ -302,12 +302,13 @@ public function transform(InterfaceItemPedido $orderItem)
 **Resposta do Candidato:**
 > **14.1:** "fazer um group-by por estado, um count para as ocorrencias por estado e order by quantidades de ocorrencias"  
 > **14.2:** "fazer um group-by por cliente, um sum de todos os valores totais e order by valor total agregado"  
-> **14.3:** "primeiro, implementar um index para data do pedido, já que em muitas situações de uso real se ordena os pedidos por intervalo de data, seja auditoria ou simplesmente facilitar fechamento do mes, depois, como parece que estado é algo relevante para o sistema levando em conta as perguntas anteriores, eu também criaria um index para essa coluna, implementaria também o with para o cliente relacionado ao pedido dentro do eloquent no laravel"
+> **14.3:** "primeiro, implementar um index para data do pedido, já que em muitas situações de uso real se ordena os pedidos por intervalo de data, seja auditoria ou simplesmente facilitar fechamento do mes, depois, como parece que estado é algo relevante para o sistema levando em conta as perguntas anteriores, eu também criaria um index para essa coluna, implementaria também o with para o cliente relacionado ao pedido dentro do eloquent no laravel. Além disso, usaria o cache de dados do banco com algo como Redis ou Memcached para não onerar o banco com consultas repetitivas de agregação."
 
-**Análise Crítica & Comparação com o Gabarito (Nota 8.5 / 10 - Boa Visão Prática de Negócio e Indexação):**
+**Análise Crítica & Comparação com o Gabarito (Nota 9.5 / 10 - Domínio Completo de Indexação, Cache e ORM):**
 
 - **Pontos Positivos / Acertos Impecáveis:**
   - **14.2 — Lógica Completa de Agregação de Vendas:** Identificou perfeitamente os 3 passos necessários: agrupar por cliente (`GROUP BY cliente_id`), calcular a soma dos valores (`SUM(valor_total)`) e ordenar pelo total agregado de forma decrescente (`ORDER BY valor_total DESC`).
+  - **14.3 — Caching de Consultas com Redis / Memcached:** Excelente adição! Identificou a principal boa prática de arquitetura para tabelas de alto volume: armazenar em memória (Redis/Memcached) o resultado de relatórios e agregações pesadas para evitar ler o banco de dados SQL a cada requisição.
   - **14.3 — Visão Prática do Uso Real de Índices:** Demonstrou ótima vivência em sistemas reais ao sugerir indexar a data do pedido (`pedidos(data_pedido)`), prevendo que relatórios financeiros, fechamento de mês e auditorias filtram e ordenam por faixas temporais.
   - **14.3 — Indexação da Coluna de Agrupamento:** Acertou ao identificar que indexar a coluna `clientes(estado)` agiliza as consultas de agregação por localização geográfica.
   - **14.3 — Prevenção do Gargalo N+1 no Laravel:** Identificou o uso da cláusula `with('cliente')` (*Eager Loading*) no Eloquent para carregar os dados do relacionamento sem incorrer em M+1 queries SQL.
