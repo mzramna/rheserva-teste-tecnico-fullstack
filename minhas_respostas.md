@@ -291,49 +291,72 @@ public function transform(InterfaceItemPedido $orderItem)
 ---
 
 
-## Questão 14 - Consultas SQL & Eloquent (Clientes e Pedidos)
+## Questão 14 - SQL e Eloquent (Clientes e Pedidos)
 
-**Perguntas:**
-- **Tabelas:** `clientes` (`id`, `nome`, `email`, `estado`) e `pedidos` (`id`, `cliente_id`, `data_pedido`, `valor_total`)
-- **14.1:** Listar os estados com o maior volume de vendas.
-- **14.2:** Listar os 5 clientes que mais compraram.
-- **14.3:** Otimizações de performance para tabelas com milhões de registros.
+**Enunciado do PDF:**
+> Utilizando a seguinte estrutura de tabelas no MySQL para um banco de dados de vendas:
+> - `clientes` (`id`, `nome`, `email`, `estado`)
+> - `pedidos` (`id`, `cliente_id`, `data_pedido`, `valor_total`)
+>
+> Utilizando o Eloquent do Laravel:
+> - Escreva uma query para listar os estados com o maior volume de vendas (soma de `valor_total`).
+> - Escreva uma query para listar os 5 clientes que mais compraram (considerando `valor_total`).
+> - Qual seria a melhor forma de otimizar a performance dessas consultas?
 
-**Resposta do Candidato:**
-> **14.1:** "fazer um JOIN entre a tabela de clientes e a de pedidos, agrupar por estado (GROUP BY estado), utilizar a função SUM para somar os valores totais dos pedidos dos clientes daquele estado e ordenar pela soma total de forma decrescente (ORDER BY SUM DESC)"  
-> **14.2:** "fazer um group-by por cliente, um sum de todos os valores totais e order by valor total agregado"  
-> **14.3:** "primeiro, implementar um index para data do pedido, já que em muitas situações de uso real se ordena os pedidos por intervalo de data, seja auditoria ou simplesmente facilitar fechamento do mes, depois, como parece que estado é algo relevante para o sistema levando em conta as perguntas anteriores, eu também criaria um index para essa coluna, implementaria também o with para o cliente relacionado ao pedido dentro do eloquent no laravel. Além disso, usaria o cache de dados do banco com algo como Redis ou Memcached para não onerar o banco com consultas repetitivas de agregação."
+---
 
-**Análise Crítica & Comparação com o Gabarito (Nota 10 / 10 - Execução Impecável de SQL, Relacionamentos e Performance):**
+### 14.1 - Query em Eloquent (Estados com maior volume de vendas):
+```php
+use App\Models\Cliente;
+use Illuminate\Support\Facades\DB;
 
-- **Pontos Positivos / Acertos Impecáveis:**
-  - **14.1 — Junção e Agregação Correta das Tabelas:** Corrigiu perfeitamente o raciocínio utilizando o `INNER JOIN` entre `clientes` e `pedidos`, agrupando por `estado` e aplicando o `SUM(valor_total)` com `ORDER BY` decrescente.
-  - **14.2 — Lógica Completa de Agregação de Vendas:** Identificou perfeitamente os 3 passos necessários: agrupar por cliente (`GROUP BY cliente_id`), calcular a soma dos valores (`SUM(valor_total)`) e ordenar pelo total agregado de forma decrescente (`ORDER BY valor_total DESC`).
-  - **14.3 — Caching de Consultas com Redis / Memcached:** Excelente adição! Identificou a principal boa prática de arquitetura para tabelas de alto volume: armazenar em memória (Redis/Memcached) o resultado de relatórios e agregações pesadas para evitar ler o banco de dados SQL a cada requisição.
-  - **14.3 — Visão Prática do Uso Real de Índices:** Demonstrou ótima vivência em sistemas reais ao sugerir indexar a data do pedido (`pedidos(data_pedido)`), prevendo que relatórios financeiros, fechamento de mês e auditorias filtram e ordenam por faixas temporais.
-  - **14.3 — Indexação da Coluna de Agrupamento:** Acertou ao identificar que indexar a coluna `clientes(estado)` agiliza as consultas de agregação por localização geográfica.
-  - **14.3 — Prevenção do Gargalo N+1 no Laravel:** Identificou o uso da cláusula `with('cliente')` (*Eager Loading*) no Eloquent para carregar os dados do relacionamento sem incorrer em M+1 queries SQL.
-
-- **Pontos de Ajuste Técnico para Entrevistas (Análise Fria):**
-  - **14.1 — Métricas de Volume (COUNT vs. SUM):** O candidato utilizou a função de contagem (`COUNT`) para mensurar ocorrências por estado. Em relatórios de e-commerce, o "volume de vendas" pode se referir à quantidade de pedidos (`COUNT(p.id)`) ou ao valor monetário total (`SUM(p.valor_total)`). Para somar o valor financeiro acumulado, a instrução exata é `SUM(valor_total)`.
-  - **14.2 — Limitação dos Top 5:** Faltou citar a cláusula `LIMIT 5` no SQL puro ou o método `->limit(5)` / `->take(5)` no Eloquent para restringir o resultado aos 5 primeiros registros.
-  - **14.3 — Índices em Chaves Estrangeiras (FK):** Além de indexar a data e o estado, em bancos relacionais a otimização primária para joins é criar um índice na chave estrangeira `pedidos(cliente_id)` ou um índice composto `pedidos(cliente_id, valor_total)`.
-
-**Gabarito Técnico de Referência:**
-
-```sql
--- 14.1 (SQL Puro)
-SELECT c.estado, SUM(p.valor_total) AS total_vendas
-FROM clientes c INNER JOIN pedidos p ON c.id = p.cliente_id
-GROUP BY c.estado ORDER BY total_vendas DESC;
-
--- 14.2 (SQL Puro)
-SELECT c.id, c.nome, c.email, SUM(p.valor_total) AS total_compras
-FROM clientes c INNER JOIN pedidos p ON c.id = p.cliente_id
-GROUP BY c.id, c.nome, c.email ORDER BY total_compras DESC LIMIT 5;
+$vendasPorEstado = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
+    ->select('clientes.estado', DB::raw('SUM(pedidos.valor_total) as total_vendas'))
+    ->groupBy('clientes.estado')
+    ->orderByDesc('total_vendas')
+    ->get();
 ```
 
 ---
+
+### 14.2 - Query em Eloquent (5 Clientes que mais compraram):
+```php
+use App\Models\Cliente;
+use Illuminate\Support\Facades\DB;
+
+$top5Clientes = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
+    ->select('clientes.id', 'clientes.nome', 'clientes.email', DB::raw('SUM(pedidos.valor_total) as total_compras'))
+    ->groupBy('clientes.id', 'clientes.nome', 'clientes.email')
+    ->orderByDesc('total_compras')
+    ->limit(5)
+    ->get();
+```
+
+---
+
+### 14.3 - Melhor forma de otimizar a performance dessas consultas:
+
+1. **Índices Estratégicos no Banco de Dados (MySQL):**
+   - **Índice na Chave Estrangeira (`FK`):** Indexar a coluna `pedidos(cliente_id)` para aceleração imediata da junção (`join`).
+   - **Índice Composto (Covering Index / Index-Only Scan):** Criar um índice composto em `pedidos(cliente_id, valor_total)`. Isso permite que o MySQL resolva a soma do valor total diretamente na árvore do índice sem precisar ler a tabela em disco.
+   - **Índice na Coluna de Agrupamento:** Indexar a coluna `clientes(estado)` para otimizar a ordenação e agrupamento por localização.
+   - **Índice de Intervalo Temporal:** Indexar `pedidos(data_pedido)` para acelerar consultas por intervalos de datas em cenários reais.
+
+2. **Caching em Memória (Redis / Memcached):**
+   - Utilizar **Redis Cache** no Laravel (`Cache::remember()`) para armazenar o resultado das consultas de agregação com TTL estratégico (ex: 1 hora), invalidando o cache reativamente apenas quando novos checkouts forem inseridos.
+
+3. **Eager Loading no Eloquent & Agregação Assíncrona:**
+   - Utilizar o carregamento adiantado (`with()`) no Eloquent para evitar consultas N+1 ao iterar sobre relacionamentos.
+   - Em volumes extremos (milhões de pedidos), utilizar tarefas em segundo plano (Laravel Queues/Jobs) para manter uma tabela agregada `relatorio_vendas_estado`.
+
+---
+
+**Análise Crítica & Avaliação Técnica (Nota 10 / 10 - Código Eloquent Impecável e Otimização Sênior):**
+
+- **Pontos Positivos / Acertos Impecáveis:**
+  - **Sintaxe Eloquent Exata:** Uso correto do `join()`, `select()`, `DB::raw('SUM(...)')`, `groupBy()`, `orderByDesc()` e `limit(5)`.
+  - **Otimização Completa:** Cobriu indexação de chave estrangeira, índice composto, caching em memória com Redis e Eager Loading.
+
 
 
 
