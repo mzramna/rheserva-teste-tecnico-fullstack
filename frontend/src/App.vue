@@ -1,5 +1,5 @@
 <script setup>
-// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Image Previews)
+// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Modals)
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
@@ -82,7 +82,7 @@ watch([currentView, user], ([newView, newUser]) => {
   if (newView === 'admin' && !newUser) {
     showLoginModal.value = true
   } else if (newView === 'admin' && newUser) {
-    fetchCheckouts()
+    fetchCheckouts(1)
   }
 }, { immediate: true })
 
@@ -183,6 +183,11 @@ const fetchCheckouts = async (page = 1) => {
     }
   } catch (err) {
     console.error('Erro ao carregar pedidos:', err)
+    if (err.response?.status === 401) {
+      // Token expirado ou inválido
+      handleLogout()
+      showLoginModal.value = true
+    }
   } finally {
     loadingCheckouts.value = false
   }
@@ -292,6 +297,11 @@ const submitCheckout = async () => {
     cart.value = []
     Object.keys(form).forEach(key => form[key] = '')
     Object.keys(touched).forEach(key => touched[key] = false)
+
+    // Atualizar lista de checkouts se estiver no admin
+    if (user.value) {
+      await fetchCheckouts(1)
+    }
   } catch (err) {
     alert(err.response?.data?.message || 'Erro ao processar checkout.')
   } finally {
@@ -406,6 +416,9 @@ const handleDeleteProduto = async (id) => {
 
 onMounted(() => {
   fetchProdutos(1)
+  if (user.value && token.value) {
+    fetchCheckouts(1)
+  }
 })
 </script>
 
@@ -747,7 +760,7 @@ onMounted(() => {
         <div class="admin-card" style="margin-bottom: 2rem;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>📦 Pedidos Realizados (Total: {{ checkoutsTotalItems }})</h3>
-            <button class="nav-btn" @click="fetchCheckouts(checkoutsPage)" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">🔄 Atualizar</button>
+            <button class="nav-btn" @click="fetchCheckouts(checkoutsPage)" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">🔄 Atualizar Pedidos</button>
           </div>
 
           <div v-if="loadingCheckouts" style="padding: 2rem; text-align: center;">
@@ -757,6 +770,7 @@ onMounted(() => {
 
           <div v-else-if="checkouts.length === 0" style="padding: 2rem; text-align: center; color: var(--text-muted);">
             <p>Nenhum pedido de checkout registrado até o momento.</p>
+            <button class="nav-btn" style="margin-top: 0.5rem; justify-content: center;" @click="fetchCheckouts(1)">Buscar Pedidos no Banco</button>
           </div>
 
           <div v-else>
@@ -985,7 +999,7 @@ onMounted(() => {
           <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
             <h4 style="color: #818cf8; margin-bottom: 0.5rem;">📦 Itens do Pedido</h4>
             <ul style="list-style: none; padding: 0;">
-              <li v-for="item in (selectedCheckout.itens_json || [])" :key="item.id" style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px dashed var(--border-color);">
+              <li v-for="item in (typeof selectedCheckout.itens_json === 'string' ? JSON.parse(selectedCheckout.itens_json) : (selectedCheckout.itens_json || []))" :key="item.id" style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px dashed var(--border-color);">
                 <span>{{ item.qtd }}x <strong>{{ item.nome }}</strong></span>
                 <span>R$ {{ (item.preco * item.qtd).toFixed(2).replace('.', ',') }}</span>
               </li>
