@@ -1,0 +1,19 @@
+# Environment files
+.env
+*.env
+
+# Dependencies & Build artifacts
+node_modules/
+vendor/
+dist/
+.vite/
+storage/*.key
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*
+
+# Logs & OS files
+.DS_Store
+*.log
