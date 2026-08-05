@@ -291,6 +291,50 @@ public function transform(InterfaceItemPedido $orderItem)
 ---
 
 
+## Questão 14 - Consultas SQL & Eloquent (Clientes e Pedidos)
+
+**Perguntas:**
+- **Tabelas:** `clientes` (`id`, `nome`, `email`, `estado`) e `pedidos` (`id`, `cliente_id`, `data_pedido`, `valor_total`)
+- **14.1:** Listar os estados com o maior volume de vendas.
+- **14.2:** Listar os 5 clientes que mais compraram.
+- **14.3:** Otimizações de performance para tabelas com milhões de registros.
+
+**Resposta do Candidato:**
+> **14.1:** "fazer um group-by por estado, um count para as ocorrencias por estado e order by quantidades de ocorrencias"  
+> **14.2:** "fazer um group-by por cliente, um sum de todos os valores totais e order by valor total agregado"  
+> **14.3:** "primeiro, implementar um index para data do pedido, já que em muitas situações de uso real se ordena os pedidos por intervalo de data, seja auditoria ou simplesmente facilitar fechamento do mes, depois, como parece que estado é algo relevante para o sistema levando em conta as perguntas anteriores, eu também criaria um index para essa coluna, implementaria também o with para o cliente relacionado ao pedido dentro do eloquent no laravel"
+
+**Análise Crítica & Comparação com o Gabarito (Nota 8.5 / 10 - Boa Visão Prática de Negócio e Indexação):**
+
+- **Pontos Positivos / Acertos Impecáveis:**
+  - **14.2 — Lógica Completa de Agregação de Vendas:** Identificou perfeitamente os 3 passos necessários: agrupar por cliente (`GROUP BY cliente_id`), calcular a soma dos valores (`SUM(valor_total)`) e ordenar pelo total agregado de forma decrescente (`ORDER BY valor_total DESC`).
+  - **14.3 — Visão Prática do Uso Real de Índices:** Demonstrou ótima vivência em sistemas reais ao sugerir indexar a data do pedido (`pedidos(data_pedido)`), prevendo que relatórios financeiros, fechamento de mês e auditorias filtram e ordenam por faixas temporais.
+  - **14.3 — Indexação da Coluna de Agrupamento:** Acertou ao identificar que indexar a coluna `clientes(estado)` agiliza as consultas de agregação por localização geográfica.
+  - **14.3 — Prevenção do Gargalo N+1 no Laravel:** Identificou o uso da cláusula `with('cliente')` (*Eager Loading*) no Eloquent para carregar os dados do relacionamento sem incorrer em M+1 queries SQL.
+
+- **Pontos de Ajuste Técnico para Entrevistas (Análise Fria):**
+  - **14.1 — Métricas de Volume (COUNT vs. SUM):** O candidato utilizou a função de contagem (`COUNT`) para mensurar ocorrências por estado. Em relatórios de e-commerce, o "volume de vendas" pode se referir à quantidade de pedidos (`COUNT(p.id)`) ou ao valor monetário total (`SUM(p.valor_total)`). Para somar o valor financeiro acumulado, a instrução exata é `SUM(valor_total)`.
+  - **14.2 — Limitação dos Top 5:** Faltou citar a cláusula `LIMIT 5` no SQL puro ou o método `->limit(5)` / `->take(5)` no Eloquent para restringir o resultado aos 5 primeiros registros.
+  - **14.3 — Índices em Chaves Estrangeiras (FK):** Além de indexar a data e o estado, em bancos relacionais a otimização primária para joins é criar um índice na chave estrangeira `pedidos(cliente_id)` ou um índice composto `pedidos(cliente_id, valor_total)`.
+
+**Gabarito Técnico de Referência:**
+
+```sql
+-- 14.1 (SQL Puro)
+SELECT c.estado, SUM(p.valor_total) AS total_vendas
+FROM clientes c INNER JOIN pedidos p ON c.id = p.cliente_id
+GROUP BY c.estado ORDER BY total_vendas DESC;
+
+-- 14.2 (SQL Puro)
+SELECT c.id, c.nome, c.email, SUM(p.valor_total) AS total_compras
+FROM clientes c INNER JOIN pedidos p ON c.id = p.cliente_id
+GROUP BY c.id, c.nome, c.email ORDER BY total_compras DESC LIMIT 5;
+```
+
+---
+
+
+
 
 
 
