@@ -6,13 +6,22 @@ use App\Models\Produto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
-// ponytail: Direct REST Controller for Produtos with Redis Caching and Sanctum auth checks on mutations
+// ponytail: Direct REST Controller for Produtos with Redis Caching, Pagination & Sanctum auth checks
 class ProdutoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Cache::remember('produtos_all_list', 60, function () {
-            return Produto::orderBy('id', 'desc')->get();
+        $perPage = $request->get('per_page', 6);
+        
+        if ($request->has('paginate') && $request->get('paginate') === 'false') {
+            return Cache::remember('produtos_all_list', 60, function () {
+                return Produto::orderBy('id', 'desc')->get();
+            });
+        }
+
+        $page = $request->get('page', 1);
+        return Cache::remember("produtos_page_{$page}_per_{$perPage}", 60, function () use ($perPage) {
+            return Produto::orderBy('id', 'desc')->paginate($perPage);
         });
     }
 
@@ -26,7 +35,7 @@ class ProdutoController extends Controller
         ]);
 
         $produto = Produto::create($validated);
-        Cache::forget('produtos_all_list');
+        Cache::flush();
 
         return response()->json($produto, 201);
     }
@@ -46,7 +55,7 @@ class ProdutoController extends Controller
         ]);
 
         $produto->update($validated);
-        Cache::forget('produtos_all_list');
+        Cache::flush();
 
         return response()->json($produto);
     }
@@ -54,7 +63,7 @@ class ProdutoController extends Controller
     public function destroy(Produto $produto)
     {
         $produto->delete();
-        Cache::forget('produtos_all_list');
+        Cache::flush();
 
         return response()->json(null, 204);
     }

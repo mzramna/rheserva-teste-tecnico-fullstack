@@ -1,5 +1,5 @@
 <script setup>
-// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout & Admin Product/Orders Management)
+// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Modals)
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
@@ -17,11 +17,25 @@ const loginForm = reactive({ email: 'admin@rheserva.com', password: 'password123
 const loginError = ref('')
 const loginLoading = ref(false)
 
-// Estado dos Produtos, Pedidos & Carrinho
+// Estado dos Produtos & Paginação
 const produtos = ref([])
-const checkouts = ref([])
 const loadingProdutos = ref(false)
+const produtosPage = ref(1)
+const produtosTotalPages = ref(1)
+const produtosTotalItems = ref(0)
+
+// Estado dos Pedidos & Paginação
+const checkouts = ref([])
 const loadingCheckouts = ref(false)
+const checkoutsPage = ref(1)
+const checkoutsTotalPages = ref(1)
+const checkoutsTotalItems = ref(0)
+
+// Estado dos Modais de Detalhe
+const selectedProduto = ref(null)
+const selectedCheckout = ref(null)
+
+// Carrinho de Compras
 const cart = ref([])
 
 // Novo Produto (Admin)
@@ -124,12 +138,23 @@ const closeLoginModal = () => {
   }
 }
 
-// Carregar Produtos da API (Público)
-const fetchProdutos = async () => {
+// Carregar Produtos Paginados da API
+const fetchProdutos = async (page = 1) => {
   loadingProdutos.value = true
+  produtosPage.value = page
   try {
-    const response = await axios.get(`${API_URL}/produtos`)
-    produtos.value = response.data
+    const response = await axios.get(`${API_URL}/produtos`, {
+      params: { page, per_page: 6 }
+    })
+    
+    // Tratar dados paginados do Laravel
+    if (response.data.data) {
+      produtos.value = response.data.data
+      produtosTotalPages.value = response.data.last_page
+      produtosTotalItems.value = response.data.total
+    } else {
+      produtos.value = response.data
+    }
   } catch (err) {
     console.error('Erro ao carregar produtos:', err)
   } finally {
@@ -137,15 +162,24 @@ const fetchProdutos = async () => {
   }
 }
 
-// Carregar Pedidos / Checkouts da API (Protegido por Token Admin)
-const fetchCheckouts = async () => {
+// Carregar Pedidos Paginados da API
+const fetchCheckouts = async (page = 1) => {
   if (!user.value || !token.value) return
   loadingCheckouts.value = true
+  checkoutsPage.value = page
   try {
     const response = await axios.get(`${API_URL}/checkouts`, {
+      params: { page, per_page: 5 },
       headers: { Authorization: `Bearer ${token.value}` }
     })
-    checkouts.value = response.data
+    
+    if (response.data.data) {
+      checkouts.value = response.data.data
+      checkoutsTotalPages.value = response.data.last_page
+      checkoutsTotalItems.value = response.data.total
+    } else {
+      checkouts.value = response.data
+    }
   } catch (err) {
     console.error('Erro ao carregar pedidos:', err)
   } finally {
@@ -277,7 +311,7 @@ const handleLogin = async () => {
     localStorage.setItem('user', JSON.stringify(user.value))
     showLoginModal.value = false
     currentView.value = 'admin'
-    await fetchCheckouts()
+    await fetchCheckouts(1)
   } catch (err) {
     loginError.value = err.response?.data?.message || 'Credenciais inválidas.'
   } finally {
@@ -301,7 +335,7 @@ const handleLogout = async () => {
   }
 }
 
-// Ações Administrativas Protegidas (Criar/Excluir Produtos exige Token de Admin)
+// Ações Administrativas Protegidas
 const handleCreateProduto = async () => {
   if (!user.value || !token.value) {
     showLoginModal.value = true
@@ -314,7 +348,7 @@ const handleCreateProduto = async () => {
       headers: { Authorization: `Bearer ${token.value}` }
     })
     Object.keys(newProduto).forEach(k => newProduto[k] = '')
-    await fetchProdutos()
+    await fetchProdutos(1)
     alert('Produto cadastrado com sucesso no banco de dados!')
   } catch (err) {
     alert(err.response?.data?.message || 'Erro 401: Ação não autorizada pelo servidor.')
@@ -335,14 +369,14 @@ const handleDeleteProduto = async (id) => {
     await axios.delete(`${API_URL}/produtos/${id}`, {
       headers: { Authorization: `Bearer ${token.value}` }
     })
-    await fetchProdutos()
+    await fetchProdutos(produtosPage.value)
   } catch (err) {
     alert('Erro 401: Exclusão não autorizada pelo servidor.')
   }
 }
 
 onMounted(() => {
-  fetchProdutos()
+  fetchProdutos(1)
 })
 </script>
 
@@ -389,14 +423,14 @@ onMounted(() => {
     <!-- Conteúdo Principal -->
     <main class="main-container">
       
-      <!-- VIEW 1: CATÁLOGO DE PRODUTOS (PÚBLICO) -->
+      <!-- VIEW 1: CATÁLOGO DE PRODUTOS (PÚBLICO E PAGINADO) -->
       <section v-if="currentView === 'store'">
         <div class="page-header">
           <h2>Catálogo de Produtos</h2>
-          <p>Escolha seus itens favoritos e adicione ao carrinho de compras</p>
+          <p>Escolha seus itens favoritos e adicione ao carrinho de compras (Clique no item para detalhes)</p>
         </div>
 
-        <div v-if="loadingProdutos" class="header" style="padding: 3rem;">
+        <div v-if="loadingProdutos" class="header" style="padding: 3rem; text-align: center;">
           <div class="btn-spinner" style="margin: 0 auto; width: 32px; height: 32px;"></div>
           <p style="margin-top: 1rem;">Carregando produtos...</p>
         </div>
@@ -405,17 +439,26 @@ onMounted(() => {
           <p>Nenhum produto cadastrado no catálogo.</p>
         </div>
 
-        <div v-else class="products-grid">
-          <div v-for="produto in produtos" :key="produto.id" class="product-card">
-            <img :src="produto.imagem || 'https://via.placeholder.com/300'" :alt="produto.nome" class="product-img" />
-            <div class="product-body">
-              <h3 class="product-title">{{ produto.nome }}</h3>
-              <p class="product-desc">{{ produto.descricao || 'Sem descrição cadastrada.' }}</p>
-              <div class="product-footer">
-                <span class="product-price">R$ {{ Number(produto.preco).toFixed(2).replace('.', ',') }}</span>
-                <button class="btn-add-cart" @click="addToCart(produto)">+ Carrinho</button>
+        <div v-else>
+          <div class="products-grid">
+            <div v-for="produto in produtos" :key="produto.id" class="product-card" @click="selectedProduto = produto">
+              <img :src="produto.imagem || 'https://via.placeholder.com/300'" :alt="produto.nome" class="product-img" />
+              <div class="product-body">
+                <h3 class="product-title">{{ produto.nome }}</h3>
+                <p class="product-desc">{{ produto.descricao || 'Sem descrição cadastrada.' }}</p>
+                <div class="product-footer">
+                  <span class="product-price">R$ {{ Number(produto.preco).toFixed(2).replace('.', ',') }}</span>
+                  <button class="btn-add-cart" @click.stop="addToCart(produto)">+ Carrinho</button>
+                </div>
               </div>
             </div>
+          </div>
+
+          <!-- Paginação do Catálogo -->
+          <div v-if="produtosTotalPages > 1" class="pagination-bar" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem;">
+            <button class="nav-btn" :disabled="produtosPage <= 1" @click="fetchProdutos(produtosPage - 1)">◀ Anterior</button>
+            <span style="font-size: 0.9rem; color: var(--text-muted);">Página {{ produtosPage }} de {{ produtosTotalPages }} (Total: {{ produtosTotalItems }} produtos)</span>
+            <button class="nav-btn" :disabled="produtosPage >= produtosTotalPages" @click="fetchProdutos(produtosPage + 1)">Próxima ▶</button>
           </div>
         </div>
       </section>
@@ -664,18 +707,18 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- VIEW 3: PAINEL ADMINISTRATIVO (QUESTÃO 10 - GESTÃO DE PRODUTOS & PEDIDOS) -->
+      <!-- VIEW 3: PAINEL ADMINISTRATIVO (QUESTÃO 10 - GESTÃO PAGINADA DE PRODUTOS & PEDIDOS) -->
       <section v-else-if="currentView === 'admin' && user">
         <div class="page-header">
           <h2>Painel Administrativo</h2>
-          <p>Gestão de produtos do catálogo e visualização de pedidos de checkout (Autenticado como {{ user.name }})</p>
+          <p>Gestão paginada de produtos do catálogo e visualização detalhada de pedidos (Autenticado como {{ user.name }})</p>
         </div>
 
-        <!-- Seção 1: Pedidos Realizados (Checkouts) -->
+        <!-- Seção 1: Pedidos Realizados (Checkouts Paginados com Modal de Detalhes) -->
         <div class="admin-card" style="margin-bottom: 2rem;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>📦 Pedidos Realizados ({{ checkouts.length }})</h3>
-            <button class="nav-btn" @click="fetchCheckouts" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">🔄 Atualizar</button>
+            <h3>📦 Pedidos Realizados (Total: {{ checkoutsTotalItems }})</h3>
+            <button class="nav-btn" @click="fetchCheckouts(checkoutsPage)" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">🔄 Atualizar</button>
           </div>
 
           <div v-if="loadingCheckouts" style="padding: 2rem; text-align: center;">
@@ -687,40 +730,40 @@ onMounted(() => {
             <p>Nenhum pedido de checkout registrado até o momento.</p>
           </div>
 
-          <table v-else class="admin-table">
-            <thead>
-              <tr>
-                <th>ID Pedido</th>
-                <th>Cliente</th>
-                <th>Endereço</th>
-                <th>Cartão</th>
-                <th>Itens</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="c in checkouts" :key="c.id">
-                <td><strong style="color: #818cf8;">{{ c.pedido_id }}</strong></td>
-                <td>
-                  <div><strong>{{ c.nome }}</strong></div>
-                  <div style="font-size: 0.8rem; color: var(--text-muted);">{{ c.email }}</div>
-                </td>
-                <td style="font-size: 0.85rem;">
-                  {{ c.rua }}, {{ c.numero }} {{ c.complemento ? '- ' + c.complemento : '' }}<br/>
-                  <span style="color: var(--text-muted);">{{ c.bairro }} - {{ c.cidade }}/{{ c.estado }} ({{ c.cep }})</span>
-                </td>
-                <td style="font-size: 0.85rem; font-family: monospace;">{{ c.cartao_final }}</td>
-                <td style="font-size: 0.85rem;">
-                  <ul style="list-style: none; padding: 0;">
-                    <li v-for="item in (c.itens_json || [])" :key="item.id">
-                      • {{ item.qtd }}x {{ item.nome }}
-                    </li>
-                  </ul>
-                </td>
-                <td><strong style="color: #6ee7b7;">R$ {{ Number(c.total).toFixed(2).replace('.', ',') }}</strong></td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID Pedido</th>
+                  <th>Cliente</th>
+                  <th>Cidade/UF</th>
+                  <th>Total</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in checkouts" :key="c.id" style="cursor: pointer;" @click="selectedCheckout = c">
+                  <td><strong style="color: #818cf8;">{{ c.pedido_id }}</strong></td>
+                  <td>
+                    <div><strong>{{ c.nome }}</strong></div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">{{ c.email }}</div>
+                  </td>
+                  <td style="font-size: 0.85rem;">{{ c.cidade }}/{{ c.estado }}</td>
+                  <td><strong style="color: #6ee7b7;">R$ {{ Number(c.total).toFixed(2).replace('.', ',') }}</strong></td>
+                  <td>
+                    <button class="nav-btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">🔍 Ver Detalhes</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Paginação de Pedidos -->
+            <div v-if="checkoutsTotalPages > 1" class="pagination-bar" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem;">
+              <button class="nav-btn" :disabled="checkoutsPage <= 1" @click="fetchCheckouts(checkoutsPage - 1)">◀ Anterior</button>
+              <span style="font-size: 0.85rem; color: var(--text-muted);">Página {{ checkoutsPage }} de {{ checkoutsTotalPages }}</span>
+              <button class="nav-btn" :disabled="checkoutsPage >= checkoutsTotalPages" @click="fetchCheckouts(checkoutsPage + 1)">Próxima ▶</button>
+            </div>
+          </div>
         </div>
 
         <!-- Seção 2: Cadastrar Novo Produto -->
@@ -757,9 +800,9 @@ onMounted(() => {
           </form>
         </div>
 
-        <!-- Seção 3: Produtos Cadastrados -->
+        <!-- Seção 3: Produtos Cadastrados (Paginados) -->
         <div class="admin-card">
-          <h3>Produtos Cadastrados no Catálogo ({{ produtos.length }})</h3>
+          <h3>Produtos Cadastrados no Catálogo (Total: {{ produtosTotalItems }})</h3>
           
           <table class="admin-table">
             <thead>
@@ -772,7 +815,7 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="p in produtos" :key="p.id">
+              <tr v-for="p in produtos" :key="p.id" style="cursor: pointer;" @click="selectedProduto = p">
                 <td>#{{ p.id }}</td>
                 <td>
                   <img :src="p.imagem || 'https://via.placeholder.com/40'" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;" />
@@ -780,15 +823,94 @@ onMounted(() => {
                 <td><strong>{{ p.nome }}</strong></td>
                 <td>R$ {{ Number(p.preco).toFixed(2).replace('.', ',') }}</td>
                 <td>
-                  <button class="btn-danger" @click="handleDeleteProduto(p.id)">Excluir</button>
+                  <button class="nav-btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.5rem;" @click.stop="selectedProduto = p">🔍 Ver</button>
+                  <button class="btn-danger" @click.stop="handleDeleteProduto(p.id)">Excluir</button>
                 </td>
               </tr>
             </tbody>
           </table>
+
+          <!-- Paginação de Produtos Admin -->
+          <div v-if="produtosTotalPages > 1" class="pagination-bar" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem;">
+            <button class="nav-btn" :disabled="produtosPage <= 1" @click="fetchProdutos(produtosPage - 1)">◀ Anterior</button>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Página {{ produtosPage }} de {{ produtosTotalPages }}</span>
+            <button class="nav-btn" :disabled="produtosPage >= produtosTotalPages" @click="fetchProdutos(produtosPage + 1)">Próxima ▶</button>
+          </div>
         </div>
       </section>
 
     </main>
+
+    <!-- MODAL DETALHES DO PRODUTO (AO CLICAR NO PRODUTO) -->
+    <div v-if="selectedProduto" class="modal-overlay" @click.self="selectedProduto = null">
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="header" style="position: relative;">
+          <button @click="selectedProduto = null" style="position: absolute; right: 0; top: 0; background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
+          <h2>{{ selectedProduto.nome }}</h2>
+          <p style="color: #818cf8; font-weight: bold; font-size: 1.2rem; margin-top: 0.25rem;">R$ {{ Number(selectedProduto.preco).toFixed(2).replace('.', ',') }}</p>
+        </div>
+
+        <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+          <img :src="selectedProduto.imagem || 'https://via.placeholder.com/400'" :alt="selectedProduto.nome" style="width: 100%; height: 220px; object-fit: cover; border-radius: 12px;" />
+          
+          <div>
+            <strong>Descrição do Produto:</strong>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.4rem; line-height: 1.5;">{{ selectedProduto.descricao || 'Nenhuma descrição detalhada informada.' }}</p>
+          </div>
+
+          <div style="font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+            ID do Registro: #{{ selectedProduto.id }}
+          </div>
+
+          <button class="btn-submit" @click="addToCart(selectedProduto); selectedProduto = null; currentView = 'cart'">
+            + Adicionar ao Carrinho e Comprar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DETALHES DO PEDIDO (AO CLICAR NO CHECKOUT EM ADMIN) -->
+    <div v-if="selectedCheckout" class="modal-overlay" @click.self="selectedCheckout = null">
+      <div class="modal-content" style="max-width: 550px;">
+        <div class="header" style="position: relative;">
+          <button @click="selectedCheckout = null" style="position: absolute; right: 0; top: 0; background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
+          <h2>Detalhes do Pedido <span style="color: #818cf8;">{{ selectedCheckout.pedido_id }}</span></h2>
+          <p style="color: #6ee7b7; font-weight: bold;">Total: R$ {{ Number(selectedCheckout.total).toFixed(2).replace('.', ',') }}</p>
+        </div>
+
+        <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem; font-size: 0.9rem;">
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="color: #818cf8; margin-bottom: 0.5rem;">👤 Dados do Cliente</h4>
+            <p><strong>Nome:</strong> {{ selectedCheckout.nome }}</p>
+            <p><strong>E-mail:</strong> {{ selectedCheckout.email }}</p>
+            <p><strong>Cartão Utiliado:</strong> <span style="font-family: monospace;">{{ selectedCheckout.cartao_final }}</span> (Validade: {{ selectedCheckout.data_validade }})</p>
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="color: #818cf8; margin-bottom: 0.5rem;">📍 Endereço de Entrega</h4>
+            <p><strong>Logradouro:</strong> {{ selectedCheckout.rua }}, Nº {{ selectedCheckout.numero }}</p>
+            <p v-if="selectedCheckout.complemento"><strong>Complemento:</strong> {{ selectedCheckout.complemento }}</p>
+            <p><strong>Bairro:</strong> {{ selectedCheckout.bairro }}</p>
+            <p><strong>Cidade/UF:</strong> {{ selectedCheckout.cidade }}/{{ selectedCheckout.estado }}</p>
+            <p><strong>CEP:</strong> {{ selectedCheckout.cep }}</p>
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h4 style="color: #818cf8; margin-bottom: 0.5rem;">📦 Itens do Pedido</h4>
+            <ul style="list-style: none; padding: 0;">
+              <li v-for="item in (selectedCheckout.itens_json || [])" :key="item.id" style="display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px dashed var(--border-color);">
+                <span>{{ item.qtd }}x <strong>{{ item.nome }}</strong></span>
+                <span>R$ {{ (item.preco * item.qtd).toFixed(2).replace('.', ',') }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <button class="nav-btn" style="width: 100%; justify-content: center; margin-top: 0.5rem;" @click="selectedCheckout = null">
+            Fechar Detalhes
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- MODAL DE LOGIN ADMIN (Aparece sempre que não estiver logado ao tentar acessar Admin) -->
     <div v-if="showLoginModal && !user" class="modal-overlay" @click.self="closeLoginModal">

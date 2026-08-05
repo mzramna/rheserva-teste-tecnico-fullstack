@@ -5,12 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Checkout;
 use Illuminate\Http\Request;
 
-// ponytail: Public Checkout Controller saving order & cart items into MySQL database
+// ponytail: Public Checkout Controller saving order & cart items into MySQL database with pagination
 class CheckoutController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Checkout::orderBy('id', 'desc')->get();
+        $perPage = $request->get('per_page', 5);
+
+        if ($request->has('paginate') && $request->get('paginate') === 'false') {
+            return Checkout::orderBy('id', 'desc')->get();
+        }
+
+        return Checkout::orderBy('id', 'desc')->paginate($perPage);
     }
 
     public function process(Request $request)
