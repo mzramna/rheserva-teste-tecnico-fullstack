@@ -1,6 +1,6 @@
 <script setup>
 // ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout & Admin Product Management)
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
 
@@ -58,6 +58,13 @@ const loadingCep = ref(false)
 const submittingCheckout = ref(false)
 const orderSuccess = ref(null)
 const cepError = ref('')
+
+// Watcher Garantidor: Se tentar acessar a view admin sem estar logado, O MODAL APARECE SEMPRE!
+watch([currentView, user], ([newView, newUser]) => {
+  if (newView === 'admin' && !newUser) {
+    showLoginModal.value = true
+  }
+}, { immediate: true })
 
 // Computed Helpers
 const cleanCep = computed(() => form.cep.replace(/\D/g, ''))
@@ -276,8 +283,7 @@ const handleLogout = async () => {
 // Ações Administrativas Protegidas (Criar/Excluir Produtos exige Token de Admin)
 const handleCreateProduto = async () => {
   if (!user.value || !token.value) {
-    alert('Acesso negado: Apenas administradores autenticados podem cadastrar produtos.')
-    closeLoginModal()
+    showLoginModal.value = true
     return
   }
 
@@ -298,8 +304,7 @@ const handleCreateProduto = async () => {
 
 const handleDeleteProduto = async (id) => {
   if (!user.value || !token.value) {
-    alert('Acesso negado: Apenas administradores autenticados podem excluir produtos.')
-    closeLoginModal()
+    showLoginModal.value = true
     return
   }
 
@@ -355,7 +360,7 @@ onMounted(() => {
         </template>
 
         <template v-else>
-          <button class="nav-btn" @click="navigateTo('admin')">🔐 Login Admin</button>
+          <button class="nav-btn" @click="showLoginModal = true">🔐 Painel Admin</button>
         </template>
       </nav>
     </header>
@@ -710,13 +715,13 @@ onMounted(() => {
 
     </main>
 
-    <!-- MODAL DE LOGIN ADMIN (Fechamento automático retorna para a página de Produtos) -->
-    <div v-if="showLoginModal" class="modal-overlay" @click.self="closeLoginModal">
+    <!-- MODAL DE LOGIN ADMIN (Aparece sempre que não estiver logado ao tentar acessar Admin) -->
+    <div v-if="showLoginModal && !user" class="modal-overlay" @click.self="closeLoginModal">
       <div class="modal-content">
         <div class="header" style="position: relative;">
           <button @click="closeLoginModal" style="position: absolute; right: 0; top: 0; background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
           <h2>Login de Administrador</h2>
-          <p>Autentique-se para gerenciar o catálogo de produtos</p>
+          <p>Informe usuário e senha para acessar o painel de produtos</p>
         </div>
 
         <div v-if="loginError" class="error-message" style="margin-bottom: 1rem; text-align: center;">
