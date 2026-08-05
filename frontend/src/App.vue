@@ -744,7 +744,7 @@ onMounted(() => {
             <span>Entrar e Acessar Painel</span>
           </button>
 
-          <button type="button" class="nav-btn" style="width: 100%; justify-content: center;" @click="closeLoginModal">
+          <button type="button" class="nav-btn btn-cancel-modal" style="width: 100%; justify-content: center;" @click="closeLoginModal">
             Cancelar e Voltar aos Produtos
           </button>
         </form>

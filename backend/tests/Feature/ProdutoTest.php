@@ -60,4 +60,26 @@ class ProdutoTest extends TestCase
         $response->assertStatus(201)
                  ->assertJsonFragment(['nome' => 'Novo Produto Admin']);
     }
+
+    public function test_permite_exclusao_de_produto_quando_autenticado(): void
+    {
+        $produto = Produto::create([
+            'nome' => 'Produto Para Excluir',
+            'preco' => 50.00,
+        ]);
+
+        $user = User::create([
+            'name' => 'Admin Teste 2',
+            'email' => 'admin2@teste.com',
+            'password' => 'password123',
+        ]);
+
+        $token = $user->createToken('test-token-2')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+                         ->deleteJson("/api/produtos/{$produto->id}");
+
+        $response->assertStatus(204);
+        $this->assertDatabaseMissing('produtos', ['id' => $produto->id]);
+    }
 }
