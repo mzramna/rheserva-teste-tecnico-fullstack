@@ -1,5 +1,5 @@
 <script setup>
-// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Modals)
+// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Edit/Delete Modals)
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
@@ -31,9 +31,10 @@ const checkoutsPage = ref(1)
 const checkoutsTotalPages = ref(1)
 const checkoutsTotalItems = ref(0)
 
-// Estado dos Modais de Detalhe
-const selectedProduto = ref(null)
-const selectedCheckout = ref(null)
+// Estado dos Modais de Detalhes & Edição
+const selectedProduto = ref(null)      // Loja Pública (Detalhes + Adicionar ao Carrinho)
+const editingProduto = ref(null)       // Painel Admin (Edição / Exclusão de Produto)
+const selectedCheckout = ref(null)     // Painel Admin (Detalhes do Pedido)
 
 // Carrinho de Compras
 const cart = ref([])
@@ -41,6 +42,7 @@ const cart = ref([])
 // Novo Produto (Admin)
 const newProduto = reactive({ nome: '', descricao: '', preco: '', imagem: '' })
 const submittingProduto = ref(false)
+const updatingProduto = ref(false)
 
 // Formulário de Checkout (Público)
 const form = reactive({
@@ -147,7 +149,6 @@ const fetchProdutos = async (page = 1) => {
       params: { page, per_page: 6 }
     })
     
-    // Tratar dados paginados do Laravel
     if (response.data.data) {
       produtos.value = response.data.data
       produtosTotalPages.value = response.data.last_page
@@ -357,6 +358,31 @@ const handleCreateProduto = async () => {
   }
 }
 
+// Abrir Modal de Edição de Produto (Admin)
+const openEditProdutoModal = (produto) => {
+  editingProduto.value = { ...produto }
+}
+
+// Salvar Edição de Produto (PUT /api/produtos/{id})
+const handleUpdateProduto = async () => {
+  if (!user.value || !token.value || !editingProduto.value) return
+
+  updatingProduto.value = true
+  try {
+    await axios.put(`${API_URL}/produtos/${editingProduto.value.id}`, editingProduto.value, {
+      headers: { Authorization: `Bearer ${token.value}` }
+    })
+    editingProduto.value = null
+    await fetchProdutos(produtosPage.value)
+    alert('Produto atualizado com sucesso!')
+  } catch (err) {
+    alert(err.response?.data?.message || 'Erro ao atualizar produto.')
+  } finally {
+    updatingProduto.value = false
+  }
+}
+
+// Excluir Produto (DELETE /api/produtos/{id})
 const handleDeleteProduto = async (id) => {
   if (!user.value || !token.value) {
     showLoginModal.value = true
@@ -369,6 +395,9 @@ const handleDeleteProduto = async (id) => {
     await axios.delete(`${API_URL}/produtos/${id}`, {
       headers: { Authorization: `Bearer ${token.value}` }
     })
+    if (editingProduto.value?.id === id) {
+      editingProduto.value = null
+    }
     await fetchProdutos(produtosPage.value)
   } catch (err) {
     alert('Erro 401: Exclusão não autorizada pelo servidor.')
@@ -711,7 +740,7 @@ onMounted(() => {
       <section v-else-if="currentView === 'admin' && user">
         <div class="page-header">
           <h2>Painel Administrativo</h2>
-          <p>Gestão paginada de produtos do catálogo e visualização detalhada de pedidos (Autenticado como {{ user.name }})</p>
+          <p>Gestão paginada de produtos e pedidos (Autenticado como {{ user.name }})</p>
         </div>
 
         <!-- Seção 1: Pedidos Realizados (Checkouts Paginados com Modal de Detalhes) -->
@@ -800,9 +829,9 @@ onMounted(() => {
           </form>
         </div>
 
-        <!-- Seção 3: Produtos Cadastrados (Paginados) -->
+        <!-- Seção 3: Produtos Cadastrados (Paginados - Clique para Editar/Excluir) -->
         <div class="admin-card">
-          <h3>Produtos Cadastrados no Catálogo (Total: {{ produtosTotalItems }})</h3>
+          <h3>Produtos Cadastrados (Total: {{ produtosTotalItems }})</h3>
           
           <table class="admin-table">
             <thead>
@@ -815,7 +844,7 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="p in produtos" :key="p.id" style="cursor: pointer;" @click="selectedProduto = p">
+              <tr v-for="p in produtos" :key="p.id" style="cursor: pointer;" @click="openEditProdutoModal(p)">
                 <td>#{{ p.id }}</td>
                 <td>
                   <img :src="p.imagem || 'https://via.placeholder.com/40'" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;" />
@@ -823,7 +852,7 @@ onMounted(() => {
                 <td><strong>{{ p.nome }}</strong></td>
                 <td>R$ {{ Number(p.preco).toFixed(2).replace('.', ',') }}</td>
                 <td>
-                  <button class="nav-btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.5rem;" @click.stop="selectedProduto = p">🔍 Ver</button>
+                  <button class="nav-btn" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.5rem;" @click.stop="openEditProdutoModal(p)">✏️ Editar / Deletar</button>
                   <button class="btn-danger" @click.stop="handleDeleteProduto(p.id)">Excluir</button>
                 </td>
               </tr>
@@ -841,8 +870,8 @@ onMounted(() => {
 
     </main>
 
-    <!-- MODAL DETALHES DO PRODUTO (AO CLICAR NO PRODUTO) -->
-    <div v-if="selectedProduto" class="modal-overlay" @click.self="selectedProduto = null">
+    <!-- MODAL LOJA PÚBLICA: DETALHES DO PRODUTO (VER / COMPRAR) -->
+    <div v-if="selectedProduto && currentView !== 'admin'" class="modal-overlay" @click.self="selectedProduto = null">
       <div class="modal-content" style="max-width: 500px;">
         <div class="header" style="position: relative;">
           <button @click="selectedProduto = null" style="position: absolute; right: 0; top: 0; background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
@@ -866,6 +895,49 @@ onMounted(() => {
             + Adicionar ao Carrinho e Comprar
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- MODAL PAINEL ADMIN: EDIÇÃO E EXCLUSÃO DO PRODUTO -->
+    <div v-if="editingProduto" class="modal-overlay" @click.self="editingProduto = null">
+      <div class="modal-content" style="max-width: 520px;">
+        <div class="header" style="position: relative;">
+          <button @click="editingProduto = null" style="position: absolute; right: 0; top: 0; background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
+          <h2>Editar Produto <span style="color: #818cf8;">#{{ editingProduto.id }}</span></h2>
+          <p>Altere os dados do produto no banco de dados ou exclua o registro</p>
+        </div>
+
+        <form @submit.prevent="handleUpdateProduto" class="form-grid" style="margin-top: 1rem;">
+          <div class="form-group full-width">
+            <label>Nome do Produto *</label>
+            <input v-model="editingProduto.nome" type="text" required />
+          </div>
+
+          <div class="form-group full-width">
+            <label>Preço (R$) *</label>
+            <input v-model="editingProduto.preco" type="number" step="0.01" required />
+          </div>
+
+          <div class="form-group full-width">
+            <label>URL da Imagem</label>
+            <input v-model="editingProduto.imagem" type="text" />
+          </div>
+
+          <div class="form-group full-width">
+            <label>Descrição</label>
+            <textarea v-model="editingProduto.descricao" rows="3"></textarea>
+          </div>
+
+          <div class="full-width" style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+            <button type="submit" class="btn-submit" style="flex: 1;" :disabled="updatingProduto">
+              <span v-if="updatingProduto" class="btn-spinner"></span>
+              <span>Salvar Alterações</span>
+            </button>
+            <button type="button" class="btn-danger" style="padding: 0.875rem 1rem; border-radius: 8px;" @click="handleDeleteProduto(editingProduto.id)">
+              🗑️ Excluir
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
