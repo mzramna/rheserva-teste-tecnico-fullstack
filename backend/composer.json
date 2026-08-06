@@ -6,7 +6,8 @@
         "php": "^8.2",
         "laravel/framework": "^11.0",
         "laravel/sanctum": "^4.0",
-        "predis/predis": "^2.2"
+        "predis/predis": "^2.2",
+        "propaganistas/laravel-phone": "^6.0"
     },
     "require-dev": {
         "mockery/mockery": "^1.6",

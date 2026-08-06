@@ -48,9 +48,7 @@ class ProdutoTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $token = $user->createToken('test-token')->plainTextToken;
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $response = $this->actingAs($user)
                          ->postJson('/api/produtos', [
                              'nome' => 'Novo Produto Admin',
                              'descricao' => 'Criado por admin',
@@ -74,9 +72,7 @@ class ProdutoTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $token = $user->createToken('test-token-2')->plainTextToken;
-
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $response = $this->actingAs($user)
                          ->deleteJson("/api/produtos/{$produto->id}");
 
         $response->assertStatus(204);

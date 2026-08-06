@@ -16,7 +16,7 @@ class CheckoutTest extends TestCase
         $response = $this->postJson('/api/checkout', []);
 
         $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['nome', 'email', 'cep', 'rua', 'bairro', 'cidade', 'estado', 'numero', 'cartao', 'data_validade']);
+                 ->assertJsonValidationErrors(['nome', 'email', 'telefone', 'cep', 'rua', 'bairro', 'cidade', 'estado', 'numero', 'cartao', 'data_validade', 'cvc']);
     }
 
     public function test_registra_checkout_com_sucesso(): void
@@ -24,6 +24,7 @@ class CheckoutTest extends TestCase
         $payload = [
             'nome' => 'Carlos Silva',
             'email' => 'carlos@teste.com',
+            'telefone' => '(11) 98765-4321',
             'cep' => '01001-000',
             'rua' => 'Praça da Sé',
             'bairro' => 'Sé',
@@ -32,6 +33,7 @@ class CheckoutTest extends TestCase
             'numero' => '100',
             'cartao' => '1234 5678 9012 3456',
             'data_validade' => '12/28',
+            'cvc' => '123',
             'itens' => [
                 ['id' => 1, 'nome' => 'Camiseta RHeserva', 'preco' => 129.90, 'qtd' => 2]
             ],

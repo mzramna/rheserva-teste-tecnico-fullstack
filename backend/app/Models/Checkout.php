@@ -12,6 +12,7 @@ class Checkout extends Model
         'pedido_id',
         'nome',
         'email',
+        'telefone',
         'cep',
         'rua',
         'bairro',

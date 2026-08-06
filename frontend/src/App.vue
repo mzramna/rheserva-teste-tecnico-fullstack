@@ -3,15 +3,20 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
+import { isValidPhoneNumber } from 'libphonenumber-js/max' // build "max" p/ distinguir MOBILE (9 dígitos) de FIXED_LINE (8 dígitos)
 
 const API_URL = '/api'
+
+// Autenticação via Cookie de Sessão (Sanctum SPA): credenciais + XSRF-TOKEN em toda requisição
+axios.defaults.withCredentials = true
+axios.defaults.withXSRFToken = true
 
 // Navegação de Views: 'store' (Loja), 'cart' (Carrinho/Checkout), 'admin' (Gestão)
 const currentView = ref('store')
 
-// Estado do Usuário Autenticado (Admin)
-const token = ref(localStorage.getItem('token') || '')
-const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+// Estado do Usuário Autenticado (Admin) — sem token exposto ao JS, sessão vive no cookie httpOnly
+const user = ref(null)
+const checkingSession = ref(true)
 const showLoginModal = ref(false)
 const loginForm = reactive({ email: 'admin@rheserva.com', password: 'password123' })
 const loginError = ref('')
@@ -36,8 +41,21 @@ const selectedProduto = ref(null)      // Loja Pública (Detalhes + Adicionar ao
 const editingProduto = ref(null)       // Painel Admin (Edição / Exclusão de Produto)
 const selectedCheckout = ref(null)     // Painel Admin (Detalhes do Pedido)
 
-// Carrinho de Compras
+// Carrinho de Compras alimentado pelos dados de Seed do Laravel Backend
 const cart = ref([])
+
+// Popula o carrinho com produtos iniciais assim que o catálogo do Seed do Backend é carregado
+const syncCartWithBackendSeed = (produtosSeed) => {
+  if (cart.value.length === 0 && Array.isArray(produtosSeed) && produtosSeed.length > 0) {
+    cart.value = produtosSeed.slice(0, 2).map(p => ({
+      id: p.id,
+      nome: p.nome,
+      preco: Number(p.preco),
+      imagem: p.imagem || 'https://via.placeholder.com/80',
+      qtd: 1
+    }))
+  }
+}
 
 // Novo Produto (Admin)
 const newProduto = reactive({ nome: '', descricao: '', preco: '', imagem: '' })
@@ -48,6 +66,7 @@ const updatingProduto = ref(false)
 const form = reactive({
   nome: '',
   email: '',
+  telefone: '',
   cep: '',
   rua: '',
   bairro: '',
@@ -56,12 +75,14 @@ const form = reactive({
   numero: '',
   complemento: '',
   cartao: '',
-  data_validade: ''
+  data_validade: '',
+  cvc: ''
 })
 
 const touched = reactive({
   nome: false,
   email: false,
+  telefone: false,
   cep: false,
   rua: false,
   bairro: false,
@@ -69,7 +90,8 @@ const touched = reactive({
   estado: false,
   numero: false,
   cartao: false,
-  data_validade: false
+  data_validade: false,
+  cvc: false
 })
 
 const loadingCep = ref(false)
@@ -93,8 +115,10 @@ const totalCartItems = computed(() => cart.value.reduce((sum, item) => sum + ite
 const cartSubtotal = computed(() => cart.value.reduce((sum, item) => sum + (item.preco * item.qtd), 0))
 
 // Validações de Formulário de Checkout
+const cleanTelefone = computed(() => form.telefone.replace(/\D/g, ''))
 const isNomeValid = computed(() => form.nome.trim().length >= 3)
 const isEmailValid = computed(() => /\S+@\S+\.\S+/.test(form.email.trim()))
+const isTelefoneValid = computed(() => isValidPhoneNumber(cleanTelefone.value, 'BR'))
 const isCepValid = computed(() => /^\d{8}$/.test(cleanCep.value))
 const isRuaValid = computed(() => form.rua.trim().length > 0)
 const isBairroValid = computed(() => form.bairro.trim().length > 0)
@@ -103,10 +127,12 @@ const isEstadoValid = computed(() => /^[A-Z]{2}$/i.test(form.estado.trim()))
 const isNumeroValid = computed(() => /^\d+$/.test(form.numero.trim()))
 const isCartaoValid = computed(() => /^\d{16}$/.test(cleanCartao.value))
 const isDataValidadeValid = computed(() => /^(0[1-9]|1[0-2])\/\d{2}$/.test(form.data_validade.trim()))
+const isCvcValid = computed(() => /^\d{3,4}$/.test(form.cvc.trim()))
 
 const isFormValid = computed(() => {
   return isNomeValid.value &&
          isEmailValid.value &&
+         isTelefoneValid.value &&
          isCepValid.value &&
          isRuaValid.value &&
          isBairroValid.value &&
@@ -115,6 +141,7 @@ const isFormValid = computed(() => {
          isNumeroValid.value &&
          isCartaoValid.value &&
          isDataValidadeValid.value &&
+         isCvcValid.value &&
          cart.value.length > 0
 })
 
@@ -156,6 +183,7 @@ const fetchProdutos = async (page = 1) => {
     } else {
       produtos.value = response.data
     }
+    syncCartWithBackendSeed(produtos.value)
   } catch (err) {
     console.error('Erro ao carregar produtos:', err)
   } finally {
@@ -165,15 +193,14 @@ const fetchProdutos = async (page = 1) => {
 
 // Carregar Pedidos Paginados da API
 const fetchCheckouts = async (page = 1) => {
-  if (!user.value || !token.value) return
+  if (!user.value) return
   loadingCheckouts.value = true
   checkoutsPage.value = page
   try {
     const response = await axios.get(`${API_URL}/checkouts`, {
-      params: { page, per_page: 5 },
-      headers: { Authorization: `Bearer ${token.value}` }
+      params: { page, per_page: 5 }
     })
-    
+
     if (response.data.data) {
       checkouts.value = response.data.data
       checkoutsTotalPages.value = response.data.last_page
@@ -184,7 +211,7 @@ const fetchCheckouts = async (page = 1) => {
   } catch (err) {
     console.error('Erro ao carregar pedidos:', err)
     if (err.response?.status === 401) {
-      // Token expirado ou inválido
+      // Sessão expirada ou inválida
       handleLogout()
       showLoginModal.value = true
     }
@@ -193,16 +220,7 @@ const fetchCheckouts = async (page = 1) => {
   }
 }
 
-// Gerenciamento do Carrinho de Compras
-const addToCart = (produto) => {
-  const existing = cart.value.find(i => i.id === produto.id)
-  if (existing) {
-    existing.qtd++
-  } else {
-    cart.value.push({ ...produto, qtd: 1 })
-  }
-}
-
+// Gerenciamento do Carrinho de Compras (Q12: sacola hardcoded, aqui só altera quantidade dos itens fixos)
 const updateQty = (index, delta) => {
   const item = cart.value[index]
   item.qtd += delta
@@ -255,6 +273,25 @@ const onCepInput = () => {
   }
 }
 
+const onTelefoneInput = () => {
+  markTouched('telefone')
+  let val = form.telefone.replace(/\D/g, '').slice(0, 11)
+  if (val.length > 10) {
+    form.telefone = val.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').trim().replace(/-$/, '')
+  } else if (val.length > 6) {
+    form.telefone = val.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').trim().replace(/-$/, '')
+  } else if (val.length > 2) {
+    form.telefone = val.replace(/(\d{2})(\d{0,5})/, '($1) $2')
+  } else {
+    form.telefone = val
+  }
+}
+
+const onCvcInput = () => {
+  markTouched('cvc')
+  form.cvc = form.cvc.replace(/\D/g, '').slice(0, 4)
+}
+
 const onNumeroInput = () => {
   markTouched('numero')
   form.numero = form.numero.replace(/\D/g, '')
@@ -291,10 +328,11 @@ const submitCheckout = async () => {
       itens: cart.value,
       total: cartSubtotal.value
     }
+    console.log('Pedido finalizado:', payload) // ponytail: log exigido pelo enunciado ao fechar o pedido
     const response = await axios.post(`${API_URL}/checkout`, payload)
     orderSuccess.value = response.data
-    
-    cart.value = []
+
+    cart.value = HARDCODED_CART_ITEMS.map(i => ({ ...i })) // ponytail: sacola hardcoded, reseta ao estado fixo do enunciado
     Object.keys(form).forEach(key => form[key] = '')
     Object.keys(touched).forEach(key => touched[key] = false)
 
@@ -309,17 +347,15 @@ const submitCheckout = async () => {
   }
 }
 
-// Autenticação Admin (Sanctum)
+// Autenticação Admin via Cookie de Sessão (Sanctum SPA)
 const handleLogin = async () => {
   loginError.value = ''
   loginLoading.value = true
 
   try {
+    await axios.get('/sanctum/csrf-cookie') // grava o cookie XSRF-TOKEN antes do login
     const response = await axios.post(`${API_URL}/login`, loginForm)
-    token.value = response.data.token
     user.value = response.data.user
-    localStorage.setItem('token', token.value)
-    localStorage.setItem('user', JSON.stringify(user.value))
     showLoginModal.value = false
     currentView.value = 'admin'
     await fetchCheckouts(1)
@@ -332,32 +368,37 @@ const handleLogin = async () => {
 
 const handleLogout = async () => {
   try {
-    await axios.post(`${API_URL}/logout`, {}, {
-      headers: { Authorization: `Bearer ${token.value}` }
-    })
+    await axios.post(`${API_URL}/logout`)
   } catch (err) {
     // Silent catch
   } finally {
-    token.value = ''
     user.value = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
     currentView.value = 'store'
+  }
+}
+
+// Verifica se já existe uma sessão válida (cookie httpOnly) ao carregar a página
+const checkSession = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/me`)
+    user.value = response.data
+  } catch (err) {
+    user.value = null
+  } finally {
+    checkingSession.value = false
   }
 }
 
 // Ações Administrativas Protegidas
 const handleCreateProduto = async () => {
-  if (!user.value || !token.value) {
+  if (!user.value) {
     showLoginModal.value = true
     return
   }
 
   submittingProduto.value = true
   try {
-    await axios.post(`${API_URL}/produtos`, newProduto, {
-      headers: { Authorization: `Bearer ${token.value}` }
-    })
+    await axios.post(`${API_URL}/produtos`, newProduto)
     Object.keys(newProduto).forEach(k => newProduto[k] = '')
     await fetchProdutos(1)
     alert('Produto cadastrado com sucesso no banco de dados!')
@@ -375,13 +416,11 @@ const openEditProdutoModal = (produto) => {
 
 // Salvar Edição de Produto (PUT /api/produtos/{id})
 const handleUpdateProduto = async () => {
-  if (!user.value || !token.value || !editingProduto.value) return
+  if (!user.value || !editingProduto.value) return
 
   updatingProduto.value = true
   try {
-    await axios.put(`${API_URL}/produtos/${editingProduto.value.id}`, editingProduto.value, {
-      headers: { Authorization: `Bearer ${token.value}` }
-    })
+    await axios.put(`${API_URL}/produtos/${editingProduto.value.id}`, editingProduto.value)
     editingProduto.value = null
     await fetchProdutos(produtosPage.value)
     alert('Produto atualizado com sucesso!')
@@ -394,7 +433,7 @@ const handleUpdateProduto = async () => {
 
 // Excluir Produto (DELETE /api/produtos/{id})
 const handleDeleteProduto = async (id) => {
-  if (!user.value || !token.value) {
+  if (!user.value) {
     showLoginModal.value = true
     return
   }
@@ -402,9 +441,7 @@ const handleDeleteProduto = async (id) => {
   if (!confirm('Deseja realmente excluir este produto?')) return
 
   try {
-    await axios.delete(`${API_URL}/produtos/${id}`, {
-      headers: { Authorization: `Bearer ${token.value}` }
-    })
+    await axios.delete(`${API_URL}/produtos/${id}`)
     if (editingProduto.value?.id === id) {
       editingProduto.value = null
     }
@@ -414,9 +451,10 @@ const handleDeleteProduto = async (id) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchProdutos(1)
-  if (user.value && token.value) {
+  await checkSession()
+  if (user.value) {
     fetchCheckouts(1)
   }
 })
@@ -490,7 +528,7 @@ onMounted(() => {
                 <p class="product-desc">{{ produto.descricao || 'Sem descrição cadastrada.' }}</p>
                 <div class="product-footer">
                   <span class="product-price">R$ {{ Number(produto.preco).toFixed(2).replace('.', ',') }}</span>
-                  <button class="btn-add-cart" @click.stop="addToCart(produto)">+ Carrinho</button>
+                  <button class="btn-add-cart" @click.stop="selectedProduto = produto">Ver Detalhes</button>
                 </div>
               </div>
             </div>
@@ -595,6 +633,22 @@ onMounted(() => {
                   :class="{ 'field-error': touched.email && !isEmailValid }"
                 />
                 <span v-if="touched.email && !isEmailValid" class="error-message">Formato de e-mail inválido.</span>
+              </div>
+
+              <!-- Telefone -->
+              <div class="form-group full-width">
+                <label for="telefone">Telefone <span class="required-asterisk">*</span></label>
+                <input
+                  id="telefone"
+                  v-model="form.telefone"
+                  type="text"
+                  placeholder="(11) 98765-4321"
+                  maxlength="15"
+                  @input="onTelefoneInput"
+                  @blur="markTouched('telefone')"
+                  :class="{ 'field-error': touched.telefone && !isTelefoneValid }"
+                />
+                <span v-if="touched.telefone && !isTelefoneValid" class="error-message">Informe um telefone válido com DDD.</span>
               </div>
 
               <!-- CEP -->
@@ -722,19 +776,35 @@ onMounted(() => {
               </div>
 
               <!-- Data de Validade -->
-              <div class="form-group full-width">
-                <label for="data_validade">Data de Validade (MM/AA) <span class="required-asterisk">*</span></label>
-                <input 
+              <div class="form-group">
+                <label for="data_validade">Validade (MM/AA) <span class="required-asterisk">*</span></label>
+                <input
                   id="data_validade"
                   v-model="form.data_validade"
                   @input="onValidadeInput"
                   @blur="markTouched('data_validade')"
-                  type="text" 
+                  type="text"
                   placeholder="12/28"
                   maxlength="5"
                   :class="{ 'field-error': touched.data_validade && !isDataValidadeValid }"
                 />
-                <span v-if="touched.data_validade && !isDataValidadeValid" class="error-message">Formato de data inválido (MM/AA).</span>
+                <span v-if="touched.data_validade && !isDataValidadeValid" class="error-message">Formato inválido (MM/AA).</span>
+              </div>
+
+              <!-- CVC -->
+              <div class="form-group">
+                <label for="cvc">CVC <span class="required-asterisk">*</span></label>
+                <input
+                  id="cvc"
+                  v-model="form.cvc"
+                  @input="onCvcInput"
+                  @blur="markTouched('cvc')"
+                  type="text"
+                  placeholder="123"
+                  maxlength="4"
+                  :class="{ 'field-error': touched.cvc && !isCvcValid }"
+                />
+                <span v-if="touched.cvc && !isCvcValid" class="error-message">3 ou 4 dígitos.</span>
               </div>
 
               <!-- Botão de Envio (Liberado APENAS quando TODOS os campos estiverem válidos) -->
@@ -812,7 +882,7 @@ onMounted(() => {
         <!-- Seção 2: Cadastrar Novo Produto (com Preview da Imagem) -->
         <div class="admin-card" style="margin-bottom: 2rem;">
           <h3>Cadastrar Novo Produto</h3>
-          
+
           <form @submit.prevent="handleCreateProduto" class="form-grid" style="margin-top: 1rem;">
             <div class="form-group">
               <label>Nome do Produto *</label>
@@ -841,7 +911,7 @@ onMounted(() => {
             </div>
 
             <div class="full-width">
-              <button type="submit" class="btn-submit" :disabled="submittingProduto || !user || !token">
+              <button type="submit" class="btn-submit" :disabled="submittingProduto || !user">
                 <span v-if="submittingProduto" class="btn-spinner"></span>
                 <span>Salvar Produto</span>
               </button>
@@ -911,8 +981,8 @@ onMounted(() => {
             ID do Registro: #{{ selectedProduto.id }}
           </div>
 
-          <button class="btn-submit" @click="addToCart(selectedProduto); selectedProduto = null; currentView = 'cart'">
-            + Adicionar ao Carrinho e Comprar
+          <button class="btn-submit" @click="selectedProduto = null">
+            Fechar
           </button>
         </div>
       </div>

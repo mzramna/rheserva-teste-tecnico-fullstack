@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Checkout;
 use Illuminate\Http\Request;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 // ponytail: Public Checkout Controller saving order & cart items into MySQL database with pagination
 class CheckoutController extends Controller
@@ -24,6 +25,8 @@ class CheckoutController extends Controller
         $validated = $request->validate([
             'nome'          => ['required', 'string', 'min:3'],
             'email'         => ['required', 'email'],
+            // regra nacional ANATEL (celular=9 dígitos / fixo=8) validada via libphonenumber (propaganistas/laravel-phone)
+            'telefone'      => ['required', 'string', (new Phone)->country('BR')],
             'cep'           => ['required', 'string'],
             'rua'           => ['required', 'string'],
             'bairro'        => ['required', 'string'],
@@ -33,6 +36,7 @@ class CheckoutController extends Controller
             'complemento'   => ['nullable', 'string'],
             'cartao'        => ['required', 'string'],
             'data_validade' => ['required', 'string', 'regex:/^(0[1-9]|1[0-2])\/\d{2}$/'],
+            'cvc'           => ['required', 'string', 'regex:/^\d{3,4}$/'], // ponytail: validado mas nunca persistido (PCI-DSS)
             'itens'         => ['nullable', 'array'],
             'total'         => ['nullable', 'numeric'],
         ]);
@@ -45,6 +49,7 @@ class CheckoutController extends Controller
             'pedido_id'     => $pedidoId,
             'nome'          => $validated['nome'],
             'email'         => $validated['email'],
+            'telefone'      => $validated['telefone'],
             'cep'           => $validated['cep'],
             'rua'           => $validated['rua'],
             'bairro'        => $validated['bairro'],

@@ -20,13 +20,15 @@ class AuthTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response = $this->postJson('/api/login', [
-            'email' => 'admin@rheserva.com',
-            'password' => 'password123',
-        ]);
+        // ponytail: Referer simula requisição vinda do frontend (exigido pelo EnsureFrontendRequestsAreStateful)
+        $response = $this->withHeader('Referer', 'http://localhost:880')
+                         ->postJson('/api/login', [
+                             'email' => 'admin@rheserva.com',
+                             'password' => 'password123',
+                         ]);
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['status', 'user', 'token']);
+                 ->assertJsonStructure(['status', 'user']);
     }
 
     public function test_login_com_credenciais_invalidas(): void
