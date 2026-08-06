@@ -291,9 +291,3 @@ $produtosRecentesBrasilEstoqueAlto = Produto::whereHas('fornecedor', function ($
 ```
 
 ---
-
-<!-- Comentário: Versões antigas do repositório apresentam as respostas sem esta formatação. -->
-
-> **Nota de rodapé:** O conteúdo destas respostas foi reestruturado com ajuda de inteligência artificial (IA).[^1]
-
-[^1]: Versões antigas do repositório apresentam as respostas originais sem esta formatação.

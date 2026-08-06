@@ -6,7 +6,7 @@ use App\Models\Produto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
-// ponytail: Direct REST Controller for Produtos with Redis Caching, Pagination & Sanctum auth checks
+// Direct REST Controller for Produtos with Redis Caching, Pagination & Sanctum auth checks
 class ProdutoController extends Controller
 {
     public function index(Request $request)

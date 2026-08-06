@@ -20,7 +20,7 @@ class AuthTest extends TestCase
             'password' => 'password123',
         ]);
 
-        // ponytail: Referer simula requisição vinda do frontend (exigido pelo EnsureFrontendRequestsAreStateful)
+        // Referer simula requisição vinda do frontend (exigido pelo EnsureFrontendRequestsAreStateful)
         $response = $this->withHeader('Referer', 'http://localhost:880')
                          ->postJson('/api/login', [
                              'email' => 'admin@rheserva.com',

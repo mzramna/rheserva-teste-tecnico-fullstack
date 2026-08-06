@@ -21,6 +21,7 @@ class Checkout extends Model
         'numero',
         'complemento',
         'cartao_final',
+        'titular_cartao',
         'data_validade',
         'itens_json',
         'total',

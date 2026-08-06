@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
-// ponytail: Autenticação via Cookie de Sessão (Sanctum SPA) — não emite token exposto ao JS
+// Autenticação via Cookie de Sessão (Sanctum SPA) — não emite token exposto ao JS
 class AuthController extends Controller
 {
     public function login(Request $request)

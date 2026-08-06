@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
-// ponytail: Lean authentication controller using Laravel Sanctum / Auth session
+// Lean authentication controller using Laravel Sanctum / Auth session
 class AuthController extends Controller
 {
     public function login(Request $request)

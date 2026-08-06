@@ -36,7 +36,9 @@ describe('App.vue (Checkout Validation & UI Rules)', () => {
       estado: 'SP',
       numero: '100',
       cartao: '1234 5678 9012 3456',
-      data_validade: '12/28'
+      titular_cartao: 'Carlos Silva',
+      data_validade: '12/28',
+      cvc: '123'
     })
     await wrapper.vm.$nextTick()
 

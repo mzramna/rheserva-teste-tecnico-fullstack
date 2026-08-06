@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Reverse Proxy Traefik v3.7: O SISTEMA DA QUESTÃO 10 é acessado na PORTA 880 do host
+  # Reverse Proxy Traefik v3.7: O SISTEMA DA QUESTÃO 10 é acessado na PORTA 881 do host
   traefik:
     image: traefik:v3.7
     container_name: rheserva_q10_traefik
@@ -10,10 +10,10 @@ services:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:880"
+      - "--entrypoints.web.address=:881"
     ports:
-      - "880:880"   # Porta 880 do Host -> Entrada do SISTEMA (Vue + Laravel API)
-      - "8881:8080" # Porta 8881 do Host -> Dashboard do Traefik Q10
+      - "881:881"   # Porta 881 do Host -> Entrada do SISTEMA (Vue + Laravel API)
+      - "8883:8080" # Porta 8883 do Host -> Dashboard do Traefik Q10
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 

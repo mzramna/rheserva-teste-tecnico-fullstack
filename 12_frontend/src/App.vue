@@ -1,14 +1,13 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import cepPromise from 'cep-promise'
 import { isValidPhoneNumber } from 'libphonenumber-js'
-import axios from 'axios'
 
-const API_URL = '/api'
-
-// Dados de Sacola carregados do Seed do Laravel Backend (não hardcoded no front)
-const cartItems = ref([])
-const loadingCart = ref(true)
+// Q12: sacola hardcoded no front, exatamente como pede o enunciado (não vem de API/backend)
+const cartItems = ref([
+  { id: 1, nome: 'Produto Lorem', preco: 19.90, imagem: 'https://via.placeholder.com/80', quantidade: 2 },
+  { id: 2, nome: 'Produto Ipsum', preco: 49.90, imagem: 'https://via.placeholder.com/80', quantidade: 1 },
+])
 
 const form = reactive({
   nome: '',
@@ -22,7 +21,9 @@ const form = reactive({
   numero: '',
   complemento: '',
   cartao: '',
-  data_validade: ''
+  titular_cartao: '',
+  data_validade: '',
+  cvc: ''
 })
 
 const touched = reactive({
@@ -36,7 +37,9 @@ const touched = reactive({
   estado: false,
   numero: false,
   cartao: false,
-  data_validade: false
+  titular_cartao: false,
+  data_validade: false,
+  cvc: false
 })
 
 const loadingCep = ref(false)
@@ -59,7 +62,9 @@ const isCidadeValid = computed(() => form.cidade.trim().length > 0)
 const isEstadoValid = computed(() => /^[A-Z]{2}$/i.test(form.estado.trim()))
 const isNumeroValid = computed(() => /^\d+$/.test(form.numero.trim())) // APENAS NÚMEROS
 const isCartaoValid = computed(() => /^\d{16}$/.test(cleanCartao.value))
+const isTitularCartaoValid = computed(() => form.titular_cartao.trim().length >= 3)
 const isDataValidadeValid = computed(() => /^(0[1-9]|1[0-2])\/\d{2}$/.test(form.data_validade.trim()))
+const isCvcValid = computed(() => /^\d{3,4}$/.test(form.cvc.trim()))
 
 const isFormValid = computed(() => {
   return isNomeValid.value &&
@@ -72,26 +77,13 @@ const isFormValid = computed(() => {
          isEstadoValid.value &&
          isNumeroValid.value &&
          isCartaoValid.value &&
-         isDataValidadeValid.value
+         isTitularCartaoValid.value &&
+         isDataValidadeValid.value &&
+         isCvcValid.value
 })
 
 const markTouched = (field) => {
   touched[field] = true
-}
-
-// Carregar produtos de exemplo populados pelo Seed do Laravel
-const fetchCartSeed = async () => {
-  loadingCart.value = true
-  try {
-    const res = await axios.get(`${API_URL}/produtos`)
-    if (Array.isArray(res.data) && res.data.length > 0) {
-      cartItems.value = res.data.map(p => ({ ...p, quantidade: 1 }))
-    }
-  } catch (err) {
-    console.warn('Backend indisponível, aguardando execução da API:', err)
-  } finally {
-    loadingCart.value = false
-  }
 }
 
 const valorTotal = computed(() => {
@@ -179,28 +171,33 @@ const onValidadeInput = () => {
   }
 }
 
-const submitCheckout = async () => {
+const onCvcInput = () => {
+  markTouched('cvc')
+  form.cvc = form.cvc.replace(/\D/g, '').slice(0, 4)
+}
+
+// Q12: exercício 100% front-end — sucesso é definido apenas pela validade dos campos (sem backend),
+// e o objeto final do pedido deve ser exibido no console ao fechar (requisito explícito do enunciado)
+const submitCheckout = () => {
   Object.keys(touched).forEach(k => touched[k] = true)
   if (!isFormValid.value) return
 
   submitting.value = true
   orderSuccess.value = null
 
-  try {
-    const response = await axios.post(`${API_URL}/checkout`, form)
-    orderSuccess.value = response.data
-    Object.keys(form).forEach(key => form[key] = '')
-    Object.keys(touched).forEach(key => touched[key] = false)
-  } catch (err) {
-    alert(err.response?.data?.message || 'Erro ao processar checkout.')
-  } finally {
-    submitting.value = false
+  const pedidoFinal = {
+    pedido_id: 'PED-' + Math.random().toString(36).slice(2, 10).toUpperCase(),
+    ...form,
+    itens: cartItems.value,
+    total: valorTotal.value
   }
-}
+  console.log('Pedido finalizado:', pedidoFinal)
 
-onMounted(() => {
-  fetchCartSeed()
-})
+  orderSuccess.value = pedidoFinal
+  Object.keys(form).forEach(key => form[key] = '')
+  Object.keys(touched).forEach(key => touched[key] = false)
+  submitting.value = false
+}
 </script>
 
 <template>
@@ -399,49 +396,68 @@ onMounted(() => {
               <span v-if="touched.cartao && !isCartaoValid" class="error-message">Cartão deve conter 16 dígitos.</span>
             </div>
 
-            <!-- Data de Validade -->
+            <!-- Titular do Cartão -->
             <div class="form-group full-width">
-              <label for="data_validade">Data de Validade (MM/AA) <span class="required-asterisk">*</span></label>
-              <input 
+              <label for="titular_cartao">Titular do Cartão <span class="required-asterisk">*</span></label>
+              <input
+                id="titular_cartao"
+                v-model="form.titular_cartao"
+                type="text"
+                placeholder="Nome impresso no cartão"
+                @blur="markTouched('titular_cartao')"
+                @input="markTouched('titular_cartao')"
+                :class="{ 'field-error': touched.titular_cartao && !isTitularCartaoValid }"
+              />
+              <span v-if="touched.titular_cartao && !isTitularCartaoValid" class="error-message">Informe ao menos 3 caracteres.</span>
+            </div>
+
+            <!-- Data de Validade -->
+            <div class="form-group">
+              <label for="data_validade">Validade (MM/AA) <span class="required-asterisk">*</span></label>
+              <input
                 id="data_validade"
                 v-model="form.data_validade"
                 @input="onValidadeInput"
                 @blur="markTouched('data_validade')"
-                type="text" 
+                type="text"
                 placeholder="12/28"
                 maxlength="5"
                 :class="{ 'field-error': touched.data_validade && !isDataValidadeValid }"
               />
-              <span v-if="touched.data_validade && !isDataValidadeValid" class="error-message">Formato de data inválido (MM/AA).</span>
+              <span v-if="touched.data_validade && !isDataValidadeValid" class="error-message">Formato inválido (MM/AA).</span>
+            </div>
+
+            <!-- CVC -->
+            <div class="form-group">
+              <label for="cvc">CVC <span class="required-asterisk">*</span></label>
+              <input
+                id="cvc"
+                v-model="form.cvc"
+                @input="onCvcInput"
+                @blur="markTouched('cvc')"
+                type="text"
+                placeholder="123"
+                maxlength="4"
+                :class="{ 'field-error': touched.cvc && !isCvcValid }"
+              />
+              <span v-if="touched.cvc && !isCvcValid" class="error-message">3 ou 4 dígitos.</span>
             </div>
 
             <!-- Botão de Envio (Liberado APENAS quando TODOS os campos estiverem válidos) -->
             <div class="full-width">
               <button type="submit" class="btn-submit" :disabled="!isFormValid || submitting || loadingCep">
                 <span v-if="submitting" class="btn-spinner"></span>
-                <span>{{ submitting ? 'Processando Checkout...' : 'Confirmar e Pagar' }}</span>
+                <span>{{ submitting ? 'Processando...' : 'Fechar Pedido' }}</span>
               </button>
             </div>
           </form>
         </div>
 
-        <!-- Sacola de Itens (Carregados via Seed do Laravel Backend) -->
+        <!-- Sacola de Itens (Hardcoded, conforme o enunciado da Questão 12) -->
         <div class="card summary-card">
-          <h3>Resumo da Sacola <span class="badge-seed">Laravel Seed Data</span></h3>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
-            Itens alimentados via banco de dados MySQL pelo <code>DatabaseSeeder</code> do backend.
-          </p>
+          <h3>Sua Sacola</h3>
 
-          <div v-if="loadingCart" style="text-align: center; padding: 2rem;">
-            <div class="btn-spinner" style="width: 24px; height: 24px; margin: 0 auto;"></div>
-            <p style="margin-top: 0.5rem; font-size: 0.85rem;">Carregando produtos do seed...</p>
-          </div>
-
-          <div v-else-if="cartItems.length === 0" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-            <p>Nenhum produto cadastrado no banco.</p>
-          </div>
-
-          <div v-else class="cart-list">
+          <div class="cart-list">
             <div v-for="item in cartItems" :key="item.id" class="cart-item">
               <img :src="item.imagem || 'https://via.placeholder.com/80'" :alt="item.nome" class="cart-img" />
               <div class="cart-info">

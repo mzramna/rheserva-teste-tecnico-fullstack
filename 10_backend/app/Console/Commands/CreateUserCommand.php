@@ -6,7 +6,7 @@ use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 
-// ponytail: Simple Artisan command to create users from CLI
+// Simple Artisan command to create users from CLI
 class CreateUserCommand extends Command
 {
     protected $signature = 'user:create {email? : O e-mail do usuário} {name? : O nome do usuário} {password? : A senha do usuário}';

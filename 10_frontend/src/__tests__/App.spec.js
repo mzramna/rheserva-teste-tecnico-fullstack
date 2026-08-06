@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import App from '../App.vue'
 
-// ponytail: Lean frontend component tests checking render and auth state boundaries
+// Lean frontend component tests checking render and auth state boundaries
 describe('App.vue', () => {
   beforeEach(() => {
     localStorage.clear()

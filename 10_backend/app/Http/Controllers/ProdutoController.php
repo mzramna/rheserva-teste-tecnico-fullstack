@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
-// ponytail: Direct REST Controller using Redis Cache for read operations
+// Direct REST Controller using Redis Cache for read operations
 class ProdutoController extends Controller
 {
     private string $cacheKey = 'produtos_all_list';

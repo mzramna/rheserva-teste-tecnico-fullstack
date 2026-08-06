@@ -6,7 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-// ponytail: Testes automatizados cobrindo a criacao de usuarios via Artisan CLI
+// Testes automatizados cobrindo a criacao de usuarios via Artisan CLI
 class CreateUserCommandTest extends TestCase
 {
     use RefreshDatabase;

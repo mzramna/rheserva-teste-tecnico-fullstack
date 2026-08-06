@@ -16,7 +16,7 @@ class CheckoutTest extends TestCase
         $response = $this->postJson('/api/checkout', []);
 
         $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['nome', 'email', 'telefone', 'cep', 'rua', 'bairro', 'cidade', 'estado', 'numero', 'cartao', 'data_validade', 'cvc']);
+                 ->assertJsonValidationErrors(['nome', 'email', 'telefone', 'cep', 'rua', 'bairro', 'cidade', 'estado', 'numero', 'cartao', 'titular_cartao', 'data_validade', 'cvc']);
     }
 
     public function test_registra_checkout_com_sucesso(): void
@@ -32,6 +32,7 @@ class CheckoutTest extends TestCase
             'estado' => 'SP',
             'numero' => '100',
             'cartao' => '1234 5678 9012 3456',
+            'titular_cartao' => 'Carlos Silva',
             'data_validade' => '12/28',
             'cvc' => '123',
             'itens' => [

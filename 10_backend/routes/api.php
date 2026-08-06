@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProdutoController;
 use App\Http\Controllers\AuthController;
 
-// ponytail: Clean REST routes without extra wrappers
+// Clean REST routes without extra wrappers
 // Public Read routes
 Route::get('/produtos', [ProdutoController::class, 'index']);
 Route::get('/produtos/{produto}', [ProdutoController::class, 'show']);

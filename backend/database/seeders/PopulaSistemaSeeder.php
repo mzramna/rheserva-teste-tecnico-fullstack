@@ -8,7 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-// ponytail: Seeder populando produtos e pedidos de exemplo via Faker (fakerphp/faker, já incluso no Laravel)
+// Seeder populando produtos e pedidos de exemplo via Faker (fakerphp/faker, já incluso no Laravel)
 class PopulaSistemaSeeder extends Seeder
 {
     public function run(): void
@@ -65,6 +65,7 @@ class PopulaSistemaSeeder extends Seeder
                 [
                     'nome' => $faker->name(),
                     'email' => $faker->unique()->safeEmail(),
+                    'telefone' => '(11) 9' . $faker->numerify('####-####'),
                     'cep' => $faker->postcode(),
                     'rua' => $faker->streetName(),
                     'bairro' => $faker->citySuffix(),
@@ -73,6 +74,7 @@ class PopulaSistemaSeeder extends Seeder
                     'numero' => (string) $faker->buildingNumber(),
                     'complemento' => $faker->boolean(40) ? 'Apto ' . $faker->numberBetween(1, 999) : null,
                     'cartao_final' => '**** **** **** ' . $faker->numerify('####'),
+                    'titular_cartao' => $faker->name(),
                     'data_validade' => $faker->numerify('##') . '/' . $faker->numerify('##'),
                     'itens_json' => $itens,
                     'total' => round($total, 2),

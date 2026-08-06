@@ -6,7 +6,7 @@ use App\Models\Checkout;
 use Illuminate\Http\Request;
 use Propaganistas\LaravelPhone\Rules\Phone;
 
-// ponytail: Public Checkout Controller saving order & cart items into MySQL database with pagination
+// Public Checkout Controller saving order & cart items into MySQL database with pagination
 class CheckoutController extends Controller
 {
     public function index(Request $request)
@@ -35,8 +35,9 @@ class CheckoutController extends Controller
             'numero'        => ['required', 'string', 'regex:/^\d+$/'],
             'complemento'   => ['nullable', 'string'],
             'cartao'        => ['required', 'string'],
+            'titular_cartao' => ['required', 'string', 'min:3'],
             'data_validade' => ['required', 'string', 'regex:/^(0[1-9]|1[0-2])\/\d{2}$/'],
-            'cvc'           => ['required', 'string', 'regex:/^\d{3,4}$/'], // ponytail: validado mas nunca persistido (PCI-DSS)
+            'cvc'           => ['required', 'string', 'regex:/^\d{3,4}$/'], // validado mas nunca persistido (PCI-DSS)
             'itens'         => ['nullable', 'array'],
             'total'         => ['nullable', 'numeric'],
         ]);
@@ -58,6 +59,7 @@ class CheckoutController extends Controller
             'numero'        => $validated['numero'],
             'complemento'   => $validated['complemento'] ?? null,
             'cartao_final'  => $cartaoFinal,
+            'titular_cartao' => $validated['titular_cartao'],
             'data_validade' => $validated['data_validade'],
             'itens_json'    => $validated['itens'] ?? [],
             'total'         => $validated['total'] ?? 0.0,

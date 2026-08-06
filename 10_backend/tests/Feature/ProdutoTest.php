@@ -9,7 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
-// ponytail: Lean feature tests covering essential CRUD behavior & auth boundaries
+// Lean feature tests covering essential CRUD behavior & auth boundaries
 class ProdutoTest extends TestCase
 {
     use RefreshDatabase;

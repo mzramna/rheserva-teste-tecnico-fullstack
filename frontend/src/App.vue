@@ -1,5 +1,5 @@
 <script setup>
-// ponytail: Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Modals)
+// Unified Vue 3 Full-Stack Application (Catalog, Shopping Cart, CEP Checkout, Admin Management with Pagination & Modals)
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import cepPromise from 'cep-promise'
 import axios from 'axios'
@@ -41,21 +41,8 @@ const selectedProduto = ref(null)      // Loja Pública (Detalhes + Adicionar ao
 const editingProduto = ref(null)       // Painel Admin (Edição / Exclusão de Produto)
 const selectedCheckout = ref(null)     // Painel Admin (Detalhes do Pedido)
 
-// Carrinho de Compras alimentado pelos dados de Seed do Laravel Backend
+// Carrinho de Compras: populado dinamicamente pelo usuário a partir do catálogo real (não hardcoded)
 const cart = ref([])
-
-// Popula o carrinho com produtos iniciais assim que o catálogo do Seed do Backend é carregado
-const syncCartWithBackendSeed = (produtosSeed) => {
-  if (cart.value.length === 0 && Array.isArray(produtosSeed) && produtosSeed.length > 0) {
-    cart.value = produtosSeed.slice(0, 2).map(p => ({
-      id: p.id,
-      nome: p.nome,
-      preco: Number(p.preco),
-      imagem: p.imagem || 'https://via.placeholder.com/80',
-      qtd: 1
-    }))
-  }
-}
 
 // Novo Produto (Admin)
 const newProduto = reactive({ nome: '', descricao: '', preco: '', imagem: '' })
@@ -75,6 +62,7 @@ const form = reactive({
   numero: '',
   complemento: '',
   cartao: '',
+  titular_cartao: '',
   data_validade: '',
   cvc: ''
 })
@@ -90,6 +78,7 @@ const touched = reactive({
   estado: false,
   numero: false,
   cartao: false,
+  titular_cartao: false,
   data_validade: false,
   cvc: false
 })
@@ -126,6 +115,7 @@ const isCidadeValid = computed(() => form.cidade.trim().length > 0)
 const isEstadoValid = computed(() => /^[A-Z]{2}$/i.test(form.estado.trim()))
 const isNumeroValid = computed(() => /^\d+$/.test(form.numero.trim()))
 const isCartaoValid = computed(() => /^\d{16}$/.test(cleanCartao.value))
+const isTitularCartaoValid = computed(() => form.titular_cartao.trim().length >= 3)
 const isDataValidadeValid = computed(() => /^(0[1-9]|1[0-2])\/\d{2}$/.test(form.data_validade.trim()))
 const isCvcValid = computed(() => /^\d{3,4}$/.test(form.cvc.trim()))
 
@@ -140,6 +130,7 @@ const isFormValid = computed(() => {
          isEstadoValid.value &&
          isNumeroValid.value &&
          isCartaoValid.value &&
+         isTitularCartaoValid.value &&
          isDataValidadeValid.value &&
          isCvcValid.value &&
          cart.value.length > 0
@@ -183,7 +174,6 @@ const fetchProdutos = async (page = 1) => {
     } else {
       produtos.value = response.data
     }
-    syncCartWithBackendSeed(produtos.value)
   } catch (err) {
     console.error('Erro ao carregar produtos:', err)
   } finally {
@@ -220,7 +210,16 @@ const fetchCheckouts = async (page = 1) => {
   }
 }
 
-// Gerenciamento do Carrinho de Compras (Q12: sacola hardcoded, aqui só altera quantidade dos itens fixos)
+// Gerenciamento do Carrinho de Compras (catálogo real, dinâmico)
+const addToCart = (produto) => {
+  const existing = cart.value.find(i => i.id === produto.id)
+  if (existing) {
+    existing.qtd++
+  } else {
+    cart.value.push({ ...produto, qtd: 1 })
+  }
+}
+
 const updateQty = (index, delta) => {
   const item = cart.value[index]
   item.qtd += delta
@@ -328,11 +327,11 @@ const submitCheckout = async () => {
       itens: cart.value,
       total: cartSubtotal.value
     }
-    console.log('Pedido finalizado:', payload) // ponytail: log exigido pelo enunciado ao fechar o pedido
+    console.log('Pedido finalizado:', payload) // log exigido pelo enunciado ao fechar o pedido
     const response = await axios.post(`${API_URL}/checkout`, payload)
     orderSuccess.value = response.data
 
-    cart.value = HARDCODED_CART_ITEMS.map(i => ({ ...i })) // ponytail: sacola hardcoded, reseta ao estado fixo do enunciado
+    cart.value = [] // carrinho esvazia após o pedido, como num e-commerce real
     Object.keys(form).forEach(key => form[key] = '')
     Object.keys(touched).forEach(key => touched[key] = false)
 
@@ -528,7 +527,7 @@ onMounted(async () => {
                 <p class="product-desc">{{ produto.descricao || 'Sem descrição cadastrada.' }}</p>
                 <div class="product-footer">
                   <span class="product-price">R$ {{ Number(produto.preco).toFixed(2).replace('.', ',') }}</span>
-                  <button class="btn-add-cart" @click.stop="selectedProduto = produto">Ver Detalhes</button>
+                  <button class="btn-add-cart" @click.stop="addToCart(produto)">+ Carrinho</button>
                 </div>
               </div>
             </div>
@@ -775,6 +774,21 @@ onMounted(async () => {
                 <span v-if="touched.cartao && !isCartaoValid" class="error-message">Cartão deve conter 16 dígitos.</span>
               </div>
 
+              <!-- Titular do Cartão -->
+              <div class="form-group full-width">
+                <label for="titular_cartao">Titular do Cartão <span class="required-asterisk">*</span></label>
+                <input
+                  id="titular_cartao"
+                  v-model="form.titular_cartao"
+                  type="text"
+                  placeholder="Nome impresso no cartão"
+                  @blur="markTouched('titular_cartao')"
+                  @input="markTouched('titular_cartao')"
+                  :class="{ 'field-error': touched.titular_cartao && !isTitularCartaoValid }"
+                />
+                <span v-if="touched.titular_cartao && !isTitularCartaoValid" class="error-message">Informe ao menos 3 caracteres.</span>
+              </div>
+
               <!-- Data de Validade -->
               <div class="form-group">
                 <label for="data_validade">Validade (MM/AA) <span class="required-asterisk">*</span></label>
@@ -811,7 +825,7 @@ onMounted(async () => {
               <div class="full-width">
                 <button type="submit" class="btn-submit" :disabled="!isFormValid || submittingCheckout || loadingCep">
                   <span v-if="submittingCheckout" class="btn-spinner"></span>
-                  <span>{{ submittingCheckout ? 'Processando Checkout...' : 'Confirmar e Pagar' }}</span>
+                  <span>{{ submittingCheckout ? 'Processando...' : 'Fechar Pedido' }}</span>
                 </button>
               </div>
             </form>
@@ -981,8 +995,8 @@ onMounted(async () => {
             ID do Registro: #{{ selectedProduto.id }}
           </div>
 
-          <button class="btn-submit" @click="selectedProduto = null">
-            Fechar
+          <button class="btn-submit" @click="addToCart(selectedProduto); selectedProduto = null; currentView = 'cart'">
+            + Adicionar ao Carrinho e Comprar
           </button>
         </div>
       </div>
@@ -1054,7 +1068,8 @@ onMounted(async () => {
             <h4 style="color: #818cf8; margin-bottom: 0.5rem;">👤 Dados do Cliente</h4>
             <p><strong>Nome:</strong> {{ selectedCheckout.nome }}</p>
             <p><strong>E-mail:</strong> {{ selectedCheckout.email }}</p>
-            <p><strong>Cartão Utiliado:</strong> <span style="font-family: monospace;">{{ selectedCheckout.cartao_final }}</span> (Validade: {{ selectedCheckout.data_validade }})</p>
+            <p><strong>Cartão Utilizado:</strong> <span style="font-family: monospace;">{{ selectedCheckout.cartao_final }}</span> (Validade: {{ selectedCheckout.data_validade }})</p>
+            <p><strong>Titular:</strong> {{ selectedCheckout.titular_cartao }}</p>
           </div>
 
           <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color);">

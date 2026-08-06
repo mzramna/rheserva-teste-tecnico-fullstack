@@ -1,63 +1,74 @@
-# 🚀 Teste Técnico Full-Stack RHeserva (2026)
+# Teste Técnico Full-Stack RHeserva (2026)
 
-Aplicação Full-Stack E-Commerce profissional desenvolvida em **Laravel 11 (PHP 8.4)** e **Vue 3 (Composition API)**, conteinerizada via **Docker Compose** e orquestrada pelo **Traefik v3 Proxy Reverso**.
-
----
-
-## 📁 Estrutura Unificada de Diretórios do Projeto
-
-- 📁 [`infra/`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/infra): Orquestração Docker Compose com **Traefik v3** (porta `880`), **MySQL 8.0** e **Redis Alpine**.
-- 📁 [`backend/`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend): API REST Laravel 11:
-  - **Catálogo & Redis Cache:** GET `/api/produtos` público paginado, com mutações (POST/PUT/DELETE) protegidas por **Sanctum Auth**.
-  - **Checkout de Pedidos:** POST `/api/checkout` público registrando compras e endereços no MySQL (`checkouts` table). GET `/api/checkouts` protegido para administradores.
-  - **Autenticação Admin:** POST `/api/login` (`admin@rheserva.com` / `password123`).
-  - **Comando CLI Artisan:** `php artisan user:create {email} {name} {password}`.
-  - **Seeder de Dados Completo:** [`PopulaSistemaSeeder.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/database/seeders/PopulaSistemaSeeder.php) (Popula 30 produtos de e-commerce e 10 pedidos completos com imagens e endereços).
-- 📁 [`frontend/`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/frontend): Aplicação Vue 3 + Vite:
-  - **🛍️ Catálogo da Loja:** Visualização pública de produtos com paginação (6 por página) e modal de detalhes/compra.
-  - **🛒 Carrinho & Checkout (Questão 12):** Gestão de quantidade, busca automática de CEP via `cep-promise`, validações reativas, higienização numérica e aviso visual de erro apenas para campos interagidos (*dirty/touched*).
-  - **🔐 Gestão do Painel Admin (Questão 10):** Autenticação protegida com watcher reativo (modal obrigatório), formulário de criação com pré-visualização de imagem ao vivo, modal de edição/exclusão de produtos e visualização paginada com modal de detalhes de pedidos.
+Este repositório contém as 15 questões do teste técnico. As questões dissertativas (1-9, 11, 13, 14, 15) estão em [`minhas_respostas.md`](minhas_respostas.md) e [`queries_sql.sql`](queries_sql.sql) (SQL das questões 14 e 15). As questões práticas (10 e 12) estão em código, organizadas em **3 projetos separados** conforme descrito abaixo.
 
 ---
 
-## 🌾 Seeder de Dados (População do Sistema)
+## Estrutura dos projetos práticos
 
-O projeto possui um Seeder dedicado [`PopulaSistemaSeeder.php`](file:///home/mzramna/Documentos/teste_fullstack_rheserva_04_08_26/backend/database/seeders/PopulaSistemaSeeder.php) para cadastrar automaticamente **30 produtos com fotos em alta definição** e **10 pedidos completos**:
+Cada exercício prático está identificado em sua própria pasta e sobe isoladamente, sem depender dos outros:
 
+| Projeto | Pasta | O que é | Porta |
+|---|---|---|---|
+| **Questão 10** (isolada) | `10_backend/`, `10_frontend/`, `10_infra/` | CRUD de produtos (Laravel + Vue), exatamente como pedido no enunciado | `http://localhost:881` |
+| **Questão 12** (isolada) | `12_frontend/`, `12_infra/` | Página de checkout 100% front-end, carrinho hardcoded, sem backend | `http://localhost:882` |
+| **Unificado (10+12)** | `backend/`, `frontend/`, `infra/` | Loja completa combinando as duas questões num só sistema (catálogo dinâmico via API, carrinho real, painel admin, autenticação por cookie de sessão) | `http://localhost:880` |
+
+O projeto unificado existe como um extra além do que foi pedido — mostra as duas funcionalidades integradas num fluxo de e-commerce real, mas não usa dados hardcoded em lugar nenhum (todo o catálogo/carrinho vem da API). Os projetos `10_*`/`12_*` seguem o enunciado ao pé da letra (inclusive o carrinho hardcoded na Q12).
+
+---
+
+## Como subir cada projeto
+
+Todos usam Docker Compose + Traefik como proxy reverso. Pode rodar mais de um ao mesmo tempo (portas diferentes).
+
+### Questão 10 (CRUD de produtos)
 ```bash
-# Executar o Seeder dedicado via Docker
-docker exec rheserva_backend php artisan db:seed --class=PopulaSistemaSeeder
+cd 10_infra
+docker compose up -d --build
+docker exec rheserva_q10_backend php artisan migrate --force
 ```
+- Loja: `http://localhost:881`
+- Admin: `admin@rheserva.com` / `password123` (criado via seeder ou `php artisan user:create`)
 
----
+### Questão 12 (Checkout)
+```bash
+cd 12_infra
+docker compose up -d --build
+```
+- Página de checkout: `http://localhost:882` (sem backend, tudo client-side)
 
-## 🐳 Como Subir a Aplicação Completa (Porta 880)
-
+### Projeto unificado (10 + 12)
 ```bash
 cd infra
 docker compose up -d --build
 docker exec rheserva_backend php artisan migrate:fresh --seed --force
 ```
-
-- 🌐 **URL da Loja & Checkout (Traefik):** `http://localhost:880`
-- 📊 **Dashboard do Traefik:** `http://localhost:8881`
-- 🔑 **Credenciais do Admin:** `admin@rheserva.com` / `password123`
-- 🛠️ **Comando CLI Artisan:** `docker exec rheserva_backend php artisan user:create`
+- Loja + Checkout + Admin: `http://localhost:880`
+- Dashboard Traefik: `http://localhost:8881`
+- Admin: `admin@rheserva.com` / `password123`
+- Comando CLI: `docker exec rheserva_backend php artisan user:create {email} {name} {password}`
 
 ---
 
-## 🧪 Execução dos Testes Automatizados (100% Isolados em SQLite in-memory)
+## Testes automatizados
 
-### Backend (PHPUnit):
 ```bash
+# Backend (PHPUnit) — roda em SQLite em memória, não afeta o MySQL
 docker exec rheserva_backend vendor/bin/phpunit
-```
-> Executa 9 testes de integração em SQLite em memória sem afetar os dados do banco MySQL.
 
-### Frontend (Vitest):
-```bash
-docker exec rheserva_frontend npx vitest run
+# Frontend (Vitest)
+cd frontend && npx vitest run
 ```
-> Executa a suíte de testes de componentes Vue 3.
+O mesmo padrão vale para os containers `rheserva_q10_backend`/`10_frontend` e `12_frontend`.
 
 ---
+
+## Decisões técnicas e por quê
+
+- **Autenticação por cookie de sessão (Sanctum SPA)**, não token Bearer em localStorage: evita expor credenciais de acesso a JavaScript/XSS. Como o Traefik expõe front e back sob o mesmo host/porta, não há CORS cross-site a resolver — é o cenário ideal para esse modo do Sanctum.
+- **Cache com Redis** no catálogo de produtos (`Cache::remember`), invalidado a cada mutação (`Cache::forget`), para reduzir carga no MySQL em leituras repetidas.
+- **Validação de telefone via `libphonenumber-js` (front) e `propaganistas/laravel-phone` (back)**: a regra brasileira do "nono dígito" hoje é nacional e uniforme (celular = 9 dígitos, fixo = 8), então usei uma lib mantida com a metadata correta em vez de regex hardcoded, que fica desatualizada com o tempo.
+- **LESS em vez de CSS puro** no frontend unificado, conforme pedido no enunciado (personalização de estilos).
+- **CVC nunca é persistido no banco** (só validado) — prática padrão de segurança de dados de cartão (PCI-DSS).
+- **Carrinho hardcoded só na Questão 12 isolada**, dinâmico no projeto unificado — a Q12 pede explicitamente dados fixos; o projeto unificado é uma extensão que faz mais sentido com dados reais.
