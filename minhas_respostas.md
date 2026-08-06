@@ -324,32 +324,18 @@ $vendasPorEstado = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente
 
 ### 14.2 - Query em Eloquent (5 Clientes que mais compraram):
 
-#### **Abordagem 1: Eloquent Nativo com `withSum()` (Recurso Avançado do Laravel 8+)**
 ```php
 use App\Models\Cliente;
 
-// Utiliza o agregado nativo do Eloquent com subquery transparente
+// Query em Eloquent nativo utilizando withSum para agregação de relacionamentos e corte de 5 clientes
 $top5Clientes = Cliente::withSum('pedidos', 'valor_total')
     ->orderByDesc('pedidos_sum_valor_total')
     ->limit(5)
     ->get();
 ```
 
-#### **Abordagem 2: Eloquent Query Builder com `join()`**
-```php
-use App\Models\Cliente;
-use Illuminate\Support\Facades\DB;
-
-$top5Clientes = Cliente::query()
-    ->join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
-    ->selectRaw('clientes.id, clientes.nome, clientes.email, SUM(pedidos.valor_total) as total_compras')
-    ->groupBy('clientes.id', 'clientes.nome', 'clientes.email')
-    ->orderByDesc('total_compras')
-    ->limit(5)
-    ->get();
-```
-
 ---
+
 
 ### 14.3 - Melhor forma de otimizar a performance dessas consultas:
 
