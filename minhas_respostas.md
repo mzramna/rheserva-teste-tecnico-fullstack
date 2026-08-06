@@ -305,22 +305,22 @@ public function transform(InterfaceItemPedido $orderItem)
 
 ---
 
-### 14.1 - Query em Eloquent (Estados com maior volume de vendas):
+### 14.1 - Query em Eloquent (Estados com maior volume de vendas - Soma de `valor_total`):
 
 ```php
 use App\Models\Cliente;
 use Illuminate\Support\Facades\DB;
 
-// Abordagem Eloquent Query Builder
-$vendasPorEstado = Cliente::query()
-    ->join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
-    ->selectRaw('clientes.estado, SUM(pedidos.valor_total) as total_vendas')
+// Query em Eloquent do Laravel para agrupar por estado e somar o valor_total das vendas
+$vendasPorEstado = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
+    ->select('clientes.estado', DB::raw('SUM(pedidos.valor_total) as total_vendas'))
     ->groupBy('clientes.estado')
     ->orderByDesc('total_vendas')
     ->get();
 ```
 
 ---
+
 
 ### 14.2 - Query em Eloquent (5 Clientes que mais compraram):
 
