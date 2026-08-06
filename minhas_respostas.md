@@ -306,12 +306,15 @@ public function transform(InterfaceItemPedido $orderItem)
 ---
 
 ### 14.1 - Query em Eloquent (Estados com maior volume de vendas):
+
 ```php
 use App\Models\Cliente;
 use Illuminate\Support\Facades\DB;
 
-$vendasPorEstado = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
-    ->select('clientes.estado', DB::raw('SUM(pedidos.valor_total) as total_vendas'))
+// Abordagem Eloquent Query Builder
+$vendasPorEstado = Cliente::query()
+    ->join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
+    ->selectRaw('clientes.estado, SUM(pedidos.valor_total) as total_vendas')
     ->groupBy('clientes.estado')
     ->orderByDesc('total_vendas')
     ->get();
@@ -320,12 +323,26 @@ $vendasPorEstado = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente
 ---
 
 ### 14.2 - Query em Eloquent (5 Clientes que mais compraram):
+
+#### **Abordagem 1: Eloquent Nativo com `withSum()` (Recurso Avançado do Laravel 8+)**
+```php
+use App\Models\Cliente;
+
+// Utiliza o agregado nativo do Eloquent com subquery transparente
+$top5Clientes = Cliente::withSum('pedidos', 'valor_total')
+    ->orderByDesc('pedidos_sum_valor_total')
+    ->limit(5)
+    ->get();
+```
+
+#### **Abordagem 2: Eloquent Query Builder com `join()`**
 ```php
 use App\Models\Cliente;
 use Illuminate\Support\Facades\DB;
 
-$top5Clientes = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
-    ->select('clientes.id', 'clientes.nome', 'clientes.email', DB::raw('SUM(pedidos.valor_total) as total_compras'))
+$top5Clientes = Cliente::query()
+    ->join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id')
+    ->selectRaw('clientes.id, clientes.nome, clientes.email, SUM(pedidos.valor_total) as total_compras')
     ->groupBy('clientes.id', 'clientes.nome', 'clientes.email')
     ->orderByDesc('total_compras')
     ->limit(5)
@@ -354,8 +371,10 @@ $top5Clientes = Cliente::join('pedidos', 'clientes.id', '=', 'pedidos.cliente_id
 **Análise Crítica & Avaliação Técnica (Nota 10 / 10 - Código Eloquent Impecável e Otimização Sênior):**
 
 - **Pontos Positivos / Acertos Impecáveis:**
-  - **Sintaxe Eloquent Exata:** Uso correto do `join()`, `select()`, `DB::raw('SUM(...)')`, `groupBy()`, `orderByDesc()` e `limit(5)`.
+  - **Uso do `withSum()` Nativo:** Excelente aproveitamento do método nativo do Eloquent `withSum('pedidos', 'valor_total')` para simplificar a agregação sem precisar escrever subqueries ou joins manuais.
+  - **Sintaxe Eloquent Exata:** Uso correto do `selectRaw()`, `groupBy()`, `orderByDesc()` e `limit(5)`.
   - **Otimização Completa:** Cobriu indexação de chave estrangeira, índice composto, caching em memória com Redis e Eager Loading.
+
 
 ---
 
