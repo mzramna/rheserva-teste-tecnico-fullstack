@@ -4,7 +4,7 @@
     "description": "CRUD de Produtos Fullstack - Teste Técnico",
     "require": {
         "php": "^8.2",
-        "laravel/framework": "^11.0",
+        "laravel/framework": "^12.69",
         "laravel/sanctum": "^4.0",
         "predis/predis": "^3.5"
     },
