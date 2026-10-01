@@ -4,7 +4,7 @@
     "description": "Backend API RHeserva Fullstack - Produtos e Checkout",
     "require": {
         "php": "^8.2",
-        "laravel/framework": "^11.0",
+        "laravel/framework": "^12.69",
         "laravel/sanctum": "^4.0",
         "predis/predis": "^2.2",
         "propaganistas/laravel-phone": "^6.0"
